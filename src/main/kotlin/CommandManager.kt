@@ -1,8 +1,8 @@
 fun main() {
-    ConsoleManager().init()
+    CommandManager().init()
 }
 
-class ConsoleManager {
+class CommandManager {
     fun init() {
         when (readLine()) {
             "help" -> HelpCommand().execute()
