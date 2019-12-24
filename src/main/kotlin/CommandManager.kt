@@ -15,7 +15,7 @@ class CommandManager {
         val command = getCommandFrom(input)
 
         if (command is UndefinedCommand) {
-            command.execute()
+            command.execute(input!!.split("\\s".toRegex())[0])
 
             return
         }
@@ -41,6 +41,6 @@ class CommandManager {
     private fun getCommandArgsFrom(input: String?): String {
         val command = this.getCommandFrom(input)
 
-        return input!!.substring(command!!.name().length).trim()
+        return input!!.substring(command.name().length).trim()
     }
 }
