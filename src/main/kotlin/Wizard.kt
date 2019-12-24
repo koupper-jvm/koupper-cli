@@ -1,0 +1,3 @@
+interface Wizard {
+    fun init()
+}
