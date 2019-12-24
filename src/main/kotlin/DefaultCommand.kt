@@ -1,4 +1,8 @@
 class DefaultCommand : Command() {
+    override fun name(): String {
+        return "default"
+    }
+
     init {
         super.name = "kup"
         super.usage = "[${ANSIColors.ANSI_GREEN_155}command${ANSIColors.ANSI_RESET}]"
@@ -6,7 +10,7 @@ class DefaultCommand : Command() {
         super.arguments = arrayListOf("new", "help")
     }
 
-    override fun execute() {
+    override fun execute(vararg args: String) {
         super.showDescription()
 
         super.showUsage()

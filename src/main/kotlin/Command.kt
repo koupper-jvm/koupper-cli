@@ -4,7 +4,9 @@ abstract class Command {
     lateinit var description: String
     lateinit var arguments: List<String>
 
-    abstract fun execute()
+    abstract fun execute(vararg args: String)
+
+    abstract fun name(): String
 
     fun showUsage() {
         println(" ${ANSIColors.ANSI_YELLOW_229}• Usage:${ANSIColors.ANSI_RESET}")
