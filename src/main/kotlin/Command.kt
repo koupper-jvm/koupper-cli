@@ -1,3 +1,7 @@
+import ANSIColors.ANSI_GREEN_155
+import ANSIColors.ANSI_RESET
+import ANSIColors.ANSI_YELLOW_229
+
 abstract class Command {
     lateinit var name: String
     lateinit var usage: String
@@ -9,20 +13,20 @@ abstract class Command {
     abstract fun name(): String
 
     fun showUsage() {
-        println(" ${ANSIColors.ANSI_YELLOW_229}• Usage:${ANSIColors.ANSI_RESET}")
+        println(" ${ANSI_YELLOW_229}• Usage:$ANSI_RESET")
 
-        println("   ${ANSIColors.ANSI_GREEN_155}${name.toLowerCase()}${ANSIColors.ANSI_RESET} $usage")
+        println("   $ANSI_GREEN_155${name.toLowerCase()}$ANSI_RESET $usage")
     }
 
     open fun showDescription() {
-        println(" ${ANSIColors.ANSI_GREEN_155}>>${ANSIColors.ANSI_RESET}${ANSIColors.ANSI_YELLOW_229} $description \n")
+        println(" $ANSI_GREEN_155>>$ANSI_RESET$ANSI_YELLOW_229 $description \n")
     }
 
     open fun showArguments() {
-        println(" ${ANSIColors.ANSI_YELLOW_229}• Arguments:${ANSIColors.ANSI_RESET}")
+        println(" ${ANSI_YELLOW_229}• Arguments:$ANSI_RESET")
 
         for (argument in this.arguments) {
-            println("   ${ANSIColors.ANSI_GREEN_155}$argument${ANSIColors.ANSI_RESET}")
+            println("   $ANSI_GREEN_155$argument$ANSI_RESET")
         }
     }
 }

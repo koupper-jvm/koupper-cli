@@ -1,3 +1,7 @@
+import ANSIColors.ANSI_GREEN_155
+import ANSIColors.ANSI_RESET
+import ANSIColors.ANSI_YELLOW_229
+
 class DefaultCommand : Command() {
     override fun name(): String {
         return "default"
@@ -5,8 +9,8 @@ class DefaultCommand : Command() {
 
     init {
         super.name = "kup"
-        super.usage = "[${ANSIColors.ANSI_GREEN_155}command${ANSIColors.ANSI_RESET}]"
-        super.description = "KUp installer ${ANSIColors.ANSI_GREEN_155}1.0.0${ANSIColors.ANSI_RESET}"
+        super.usage = "[${ANSI_GREEN_155}command$ANSI_RESET]"
+        super.description = "KUp installer ${ANSI_GREEN_155}1.0.0$ANSI_RESET"
         super.arguments = arrayListOf("new", "help")
     }
 
@@ -19,10 +23,10 @@ class DefaultCommand : Command() {
     }
 
     override fun showArguments() {
-        println(" ${ANSIColors.ANSI_YELLOW_229}• Available commands:")
+        println(" ${ANSI_YELLOW_229}• Available commands:")
 
         for (commands in super.arguments) {
-            println("   ${ANSIColors.ANSI_GREEN_155}$commands${ANSIColors.ANSI_RESET}")
+            println("   $ANSI_GREEN_155$commands$ANSI_RESET")
         }
     }
 }
