@@ -1,5 +1,12 @@
 class HelpCommand : Command() {
-    override fun execute() {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    override fun name(): String {
+        return "help"
+    }
+
+    override fun execute(vararg args: String) {
+        val command = CommandManager().getCommandFrom(args[0])
+        command.showDescription()
+        command.showUsage()
+        command.showArguments()
     }
 }
