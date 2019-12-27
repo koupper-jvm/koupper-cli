@@ -1,3 +1,5 @@
+package io.kup.installer
+
 class HelpCommand : Command() {
     override fun name(): String {
         return "help"

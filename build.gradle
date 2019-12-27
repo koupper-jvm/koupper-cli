@@ -22,7 +22,7 @@ compileTestKotlin {
 
 jar {
     manifest {
-        attributes 'Main-Class': 'CommandManagerKt'
+        attributes 'Main-Class': 'io.kup.installer.CommandManagerKt'
     }
 
     from {

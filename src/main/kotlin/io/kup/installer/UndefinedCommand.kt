@@ -1,6 +1,8 @@
-import ANSIColors.ANSI_RESET
-import ANSIColors.ANSI_WHITE
-import ANSIColors.RED_BACKGROUND_203
+package io.kup.installer
+
+import io.kup.installer.ANSIColors.ANSI_RESET
+import io.kup.installer.ANSIColors.ANSI_WHITE
+import io.kup.installer.ANSIColors.RED_BACKGROUND_203
 
 class UndefinedCommand : Command() {
     override fun name(): String {

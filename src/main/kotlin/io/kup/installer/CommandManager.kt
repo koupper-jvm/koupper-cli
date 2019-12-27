@@ -1,8 +1,12 @@
-fun main() {
-    CommandManager().init()
-}
+package io.kup.installer
 
 class CommandManager {
+    companion object {
+        @JvmStatic fun main() {
+            CommandManager().init()
+        }
+    }
+
     fun init() {
         val input = readLine()
 

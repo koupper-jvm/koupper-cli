@@ -1,6 +1,8 @@
-import ANSIColors.ANSI_GREEN_155
-import ANSIColors.ANSI_RESET
-import ANSIColors.ANSI_YELLOW_229
+package io.kup.installer
+
+import io.kup.installer.ANSIColors.ANSI_GREEN_155
+import io.kup.installer.ANSIColors.ANSI_RESET
+import io.kup.installer.ANSIColors.ANSI_YELLOW_229
 
 class DefaultCommand : Command() {
     override fun name(): String {

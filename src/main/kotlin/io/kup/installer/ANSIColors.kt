@@ -1,3 +1,5 @@
+package io.kup.installer
+
 object ANSIColors {
     const val ANSI_WHITE = "\u001B[38;5;15m"
     const val ANSI_YELLOW_229 = "\u001B[38;5;229m"
