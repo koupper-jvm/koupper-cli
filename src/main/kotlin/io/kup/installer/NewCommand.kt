@@ -1,10 +1,16 @@
-import ANSIColors.ANSI_BLACK
-import ANSIColors.ANSI_RESET
-import ANSIColors.ANSI_YELLOW_229
-import ANSIColors.YELLOW_BACKGROUND_222
+package io.kup.installer
+
+import io.kup.installer.ANSIColors.ANSI_BLACK
+import io.kup.installer.ANSIColors.ANSI_RESET
+import io.kup.installer.ANSIColors.ANSI_YELLOW_229
+import io.kup.installer.ANSIColors.YELLOW_BACKGROUND_222
 
 class NewCommand : Command() {
-    override fun execute() {
+    override fun name(): String {
+        return "new"
+    }
+
+    override fun execute(vararg args: String) {
         print(
             """
             $ANSI_YELLOW_229
