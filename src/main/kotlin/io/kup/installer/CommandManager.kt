@@ -1,12 +1,6 @@
 package io.kup.installer
 
 class CommandManager {
-    companion object {
-        @JvmStatic fun main() {
-            CommandManager().init()
-        }
-    }
-
     fun init() {
         val input = readLine()
 
@@ -47,4 +41,8 @@ class CommandManager {
 
         return input!!.substring(command.name().length).trim()
     }
+}
+
+fun main() {
+    CommandManager().init()
 }
