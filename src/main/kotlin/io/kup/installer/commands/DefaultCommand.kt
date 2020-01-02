@@ -1,8 +1,9 @@
-package io.kup.installer
+package io.kup.installer.commands
 
 import io.kup.installer.ANSIColors.ANSI_GREEN_155
 import io.kup.installer.ANSIColors.ANSI_RESET
 import io.kup.installer.ANSIColors.ANSI_YELLOW_229
+import io.kup.installer.Command
 
 class DefaultCommand : Command() {
     override fun name(): String {
@@ -30,5 +31,7 @@ class DefaultCommand : Command() {
         for (commands in super.arguments) {
             println("   $ANSI_GREEN_155$commands$ANSI_RESET")
         }
+
+        println()
     }
 }

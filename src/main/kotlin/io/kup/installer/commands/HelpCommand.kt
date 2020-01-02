@@ -1,4 +1,7 @@
-package io.kup.installer
+package io.kup.installer.commands
+
+import io.kup.installer.Command
+import io.kup.installer.CommandManager
 
 class HelpCommand : Command() {
     override fun name(): String {
