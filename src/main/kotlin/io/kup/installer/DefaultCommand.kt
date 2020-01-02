@@ -30,5 +30,7 @@ class DefaultCommand : Command() {
         for (commands in super.arguments) {
             println("   $ANSI_GREEN_155$commands$ANSI_RESET")
         }
+
+        println()
     }
 }

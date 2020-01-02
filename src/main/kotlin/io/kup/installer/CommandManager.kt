@@ -1,23 +1,28 @@
 package io.kup.installer
 
 class CommandManager {
-    fun initWith(arg: String) {
+    fun initWith(arg: Array<String>) {
+        if (arg.isEmpty()) {
+            DefaultCommand().execute()
 
-        if (this.isFlagVersion(arg)) {
+            return
+        }
+
+        if (this.isFlagVersion(arg[0])) {
             DefaultCommand().showDescription()
 
             return
         }
 
-        val command = getCommandFrom(arg)
+        val command = getCommandFrom(arg[0])
 
         if (command is UndefinedCommand) {
-            command.execute(arg.split("\\s".toRegex())[0])
+            command.execute(arg[0].split("\\s".toRegex())[0])
 
             return
         }
 
-        val args = this.getCommandArgsFrom(arg)
+        val args = this.getCommandArgsFrom(arg[0])
 
         command.execute(args)
     }
@@ -26,7 +31,6 @@ class CommandManager {
         return when (input!!.split("\\s".toRegex())[0]) {
             "help" -> HelpCommand()
             "new" -> NewCommand()
-            "" -> DefaultCommand()
             else -> UndefinedCommand()
         }
     }
@@ -43,5 +47,5 @@ class CommandManager {
 }
 
 fun main(args: Array<String>) {
-    CommandManager().initWith(args[0])
+    CommandManager().initWith(args)
 }
