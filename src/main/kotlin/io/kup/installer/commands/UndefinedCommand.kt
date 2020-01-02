@@ -1,8 +1,9 @@
-package io.kup.installer
+package io.kup.installer.commands
 
 import io.kup.installer.ANSIColors.ANSI_RESET
 import io.kup.installer.ANSIColors.ANSI_WHITE
 import io.kup.installer.ANSIColors.RED_BACKGROUND_203
+import io.kup.installer.Command
 
 class UndefinedCommand : Command() {
     override fun name(): String {

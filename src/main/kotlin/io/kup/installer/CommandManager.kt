@@ -1,5 +1,10 @@
 package io.kup.installer
 
+import io.kup.installer.commands.DefaultCommand
+import io.kup.installer.commands.HelpCommand
+import io.kup.installer.commands.NewCommand
+import io.kup.installer.commands.UndefinedCommand
+
 class CommandManager {
     fun initWith(arg: Array<String>) {
         if (arg.isEmpty()) {
