@@ -33,7 +33,11 @@ class NewCommand : Command() {
                 KotlinOption().init()
             }
             selectedOption == "2" -> JavaOption().init()
-            else -> print("$YELLOW_BACKGROUND_222$ANSI_BLACK Option $selectedOption is not valid. Using default language. ")
+            else -> {
+                println("\n$YELLOW_BACKGROUND_222$ANSI_BLACK Option $selectedOption is not valid. Using default language.\n")
+
+                KotlinOption().init()
+            }
         }
     }
 }
