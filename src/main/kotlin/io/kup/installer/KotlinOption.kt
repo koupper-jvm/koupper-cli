@@ -1,7 +1,11 @@
 package io.kup.installer
 
+import io.kup.installer.ANSIColors.ANSI_WHITE
+
 class KotlinOption : Wizard {
     override fun init() {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+        print("$ANSI_WHITE package: ")
+
+        val sourcePackage = readLine()
     }
 }

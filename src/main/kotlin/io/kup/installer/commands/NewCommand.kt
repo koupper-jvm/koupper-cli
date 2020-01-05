@@ -28,13 +28,14 @@ class NewCommand : Command() {
 
         when {
             selectedOption!!.isEmpty() -> {
-                print("$YELLOW_BACKGROUND_222$ANSI_BLACK Using default language. ")
+                print("$YELLOW_BACKGROUND_222$ANSI_BLACK Using default language. $ANSI_RESET")
 
                 KotlinOption().init()
             }
             selectedOption == "2" -> JavaOption().init()
+            selectedOption == "1" -> KotlinOption().init()
             else -> {
-                println("\n$YELLOW_BACKGROUND_222$ANSI_BLACK Option $selectedOption is not valid. Using default language.\n")
+                println("\n$YELLOW_BACKGROUND_222$ANSI_BLACK Option $selectedOption is not valid. Using default language.$ANSI_RESET\n")
 
                 KotlinOption().init()
             }
