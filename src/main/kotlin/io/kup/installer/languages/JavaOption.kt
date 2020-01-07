@@ -1,4 +1,6 @@
-package io.kup.installer
+package io.kup.installer.languages
+
+import io.kup.installer.Wizard
 
 class JavaOption : Wizard {
     override fun init() {
