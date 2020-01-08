@@ -11,7 +11,7 @@ import io.kup.installer.constructions.ScriptOption
 
 class KotlinOption : Wizard {
     override fun init() {
-        print("${ANSI_WHITE}\nlanguage: Kotlin$ANSI_RESET")
+        print("\n${ANSI_WHITE}language: Kotlin$ANSI_RESET")
 
         print(
             """
@@ -30,7 +30,7 @@ class KotlinOption : Wizard {
 
         when {
             option!!.isEmpty() -> {
-                print("$YELLOW_BACKGROUND_222$ANSI_BLACK Using default creation. $ANSI_RESET")
+                print("\n$YELLOW_BACKGROUND_222$ANSI_BLACK Using default creation. $ANSI_RESET\n")
 
                 ProjectOption().init()
             }
