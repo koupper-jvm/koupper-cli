@@ -5,8 +5,6 @@ import io.kup.installer.ANSIColors.ANSI_RESET
 import io.kup.installer.ANSIColors.ANSI_YELLOW_229
 import io.kup.installer.ANSIColors.YELLOW_BACKGROUND_222
 import io.kup.installer.Command
-import io.kup.installer.buildtools.GradleOption
-import io.kup.installer.buildtools.MavenOption
 import io.kup.installer.languages.JavaOption
 import io.kup.installer.languages.KotlinOption
 
@@ -35,14 +33,14 @@ class NewCommand : Command() {
 
         when {
             option!!.isEmpty() -> {
-                print("$YELLOW_BACKGROUND_222$ANSI_BLACK Using default language. $ANSI_RESET")
+                print("\n$YELLOW_BACKGROUND_222$ANSI_BLACK Using default language. $ANSI_RESET\n")
 
                 KotlinOption().init()
             }
             option == "1" -> KotlinOption().init()
             option == "2" -> JavaOption().init()
             else -> {
-                println("\n$YELLOW_BACKGROUND_222$ANSI_BLACK Option $option is not valid. Using default language. $ANSI_RESET")
+                println("\n$YELLOW_BACKGROUND_222$ANSI_BLACK Option $option is not valid. Using default language. $ANSI_RESET\n")
 
                 KotlinOption().init()
             }
