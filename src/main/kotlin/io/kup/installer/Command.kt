@@ -14,10 +14,8 @@ abstract class Command {
 
     abstract fun name(): String
 
-    fun showUsage() {
+    open fun showUsage() {
         println(" ${ANSI_YELLOW_229}• Usage:$ANSI_RESET")
-
-        println("   $ANSI_GREEN_155${name.toLowerCase()}$ANSI_RESET $usage")
     }
 
     open fun showDescription() {
@@ -30,5 +28,7 @@ abstract class Command {
         for (argument in this.arguments) {
             println("   $ANSI_GREEN_155$argument$ANSI_RESET")
         }
+
+        println()
     }
 }

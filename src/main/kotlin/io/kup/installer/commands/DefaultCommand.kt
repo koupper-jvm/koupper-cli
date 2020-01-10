@@ -20,9 +20,15 @@ class DefaultCommand : Command() {
     override fun execute(vararg args: String) {
         super.showDescription()
 
-        super.showUsage()
+        this.showUsage()
 
         this.showArguments()
+    }
+
+    override fun showUsage() {
+        super.showUsage()
+
+        println("   $ANSI_GREEN_155${name.toLowerCase()}$ANSI_RESET $usage")
     }
 
     override fun showArguments() {
