@@ -29,7 +29,7 @@ class CommandManager {
 
         val args = this.getCommandArgsFrom(arg)
 
-        command.execute(args)
+        command.execute(*args)
     }
 
     fun getCommandObjectFrom(input: String): Command {
@@ -44,8 +44,8 @@ class CommandManager {
         return input == "-v" || input == "--v" || input == "--version"
     }
 
-    private fun getCommandArgsFrom(arg: Array<String>): String {
-        return if (arg.size > 1) arg[1] else ""
+    private fun getCommandArgsFrom(arg: Array<String>): Array<String> {
+        return if (arg.size > 1) arg.sliceArray(1 until arg.size) else emptyArray()
     }
 }
 
