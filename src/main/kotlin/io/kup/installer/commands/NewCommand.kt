@@ -1,6 +1,5 @@
 package io.kup.installer.commands
 
-import io.kup.installer.ANSIColors
 import io.kup.installer.ANSIColors.ANSI_BLACK
 import io.kup.installer.ANSIColors.ANSI_GREEN_155
 import io.kup.installer.ANSIColors.ANSI_RESET
@@ -13,7 +12,7 @@ import io.kup.installer.languages.KotlinOption
 class NewCommand : Command() {
     init {
         super.name = "new"
-        super.usage = "kup ${ANSIColors.ANSI_GREEN_155}new$ANSI_RESET"
+        super.usage = "kup ${ANSI_GREEN_155}new$ANSI_RESET"
         super.description = "create a new resource"
         super.arguments = emptyList()
     }
