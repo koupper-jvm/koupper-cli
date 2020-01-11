@@ -12,7 +12,7 @@ import io.kup.installer.languages.KotlinOption
 class NewCommand : Command() {
     init {
         super.name = "new"
-        super.usage = "kup ${ANSI_GREEN_155}new$ANSI_RESET"
+        super.usage = "kup ${ANSI_GREEN_155}$name$ANSI_RESET [${ANSI_GREEN_155}command$ANSI_RESET]"
         super.description = "create a new resource"
         super.arguments = emptyList()
     }
@@ -28,7 +28,7 @@ class NewCommand : Command() {
     override fun showUsage() {
         super.showUsage()
 
-        println("   kup ${ANSI_GREEN_155}new$ANSI_RESET\n")
+        println()
     }
 
     private fun askForLanguage() {

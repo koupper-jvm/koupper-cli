@@ -12,7 +12,7 @@ class DefaultCommand : Command() {
 
     init {
         super.name = "kup"
-        super.usage = "[${ANSI_GREEN_155}command$ANSI_RESET]"
+        super.usage = "$name [${ANSI_GREEN_155}command$ANSI_RESET]"
         super.description = "KUp installer ${ANSI_GREEN_155}1.0.0$ANSI_RESET"
         super.arguments = arrayListOf("new", "help")
     }
@@ -20,15 +20,9 @@ class DefaultCommand : Command() {
     override fun execute(vararg args: String) {
         super.showDescription()
 
-        this.showUsage()
-
-        this.showArguments()
-    }
-
-    override fun showUsage() {
         super.showUsage()
 
-        println("   $ANSI_GREEN_155${name.toLowerCase()}$ANSI_RESET $usage")
+        this.showArguments()
     }
 
     override fun showArguments() {
