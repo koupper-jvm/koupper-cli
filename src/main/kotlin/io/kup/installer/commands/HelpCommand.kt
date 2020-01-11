@@ -12,7 +12,7 @@ class HelpCommand : Command() {
 
     init {
         super.name = "help"
-        super.usage = "[${ANSI_GREEN_155}command$ANSI_RESET]"
+        super.usage = "kup ${ANSI_GREEN_155}$name$ANSI_RESET [${ANSI_GREEN_155}command$ANSI_RESET]"
         super.description = "Show the help for a command"
         super.arguments = arrayListOf("new", "help")
     }
@@ -22,8 +22,6 @@ class HelpCommand : Command() {
             super.showDescription()
 
             super.showUsage()
-
-            println("   kup $ANSI_GREEN_155${name.toLowerCase()}$ANSI_RESET $usage")
 
             this.showArguments()
 
