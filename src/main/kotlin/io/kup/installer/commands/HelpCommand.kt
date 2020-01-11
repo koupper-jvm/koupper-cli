@@ -29,6 +29,13 @@ class HelpCommand : Command() {
         }
 
         val command = CommandManager().getCommandObjectFrom(args[0])
+
+        if (command is UndefinedCommand) {
+            command.execute(args[0])
+
+            return
+        }
+
         command.showDescription()
         command.showUsage()
 
