@@ -4,10 +4,11 @@ import io.kup.installer.ANSIColors.ANSI_RESET
 import io.kup.installer.ANSIColors.ANSI_WHITE
 import io.kup.installer.ANSIColors.RED_BACKGROUND_203
 import io.kup.installer.Command
+import io.kup.installer.commands.AvailableCommands.UNDEFINED
 
 class UndefinedCommand : Command() {
     override fun name(): String {
-        return "undefined"
+        return UNDEFINED
     }
 
     override fun execute(vararg args: String) {

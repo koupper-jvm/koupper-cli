@@ -1,11 +1,12 @@
 package io.kup.installer
 
-import io.kup.installer.commands.DefaultCommand
-import io.kup.installer.commands.HelpCommand
-import io.kup.installer.commands.NewCommand
-import io.kup.installer.commands.UndefinedCommand
+import io.kup.installer.commands.*
+import io.kup.installer.commands.AvailableCommands.HELP
+import io.kup.installer.commands.AvailableCommands.NEW
+import io.kup.installer.commands.AvailableCommands.RUN
 
 class CommandManager {
+
     fun initWith(arg: Array<String>) {
         if (arg.isEmpty()) {
             DefaultCommand().execute()
@@ -34,8 +35,9 @@ class CommandManager {
 
     fun getCommandObjectFrom(input: String): Command {
         return when (input) {
-            "help" -> HelpCommand()
-            "new" -> NewCommand()
+            HELP -> HelpCommand()
+            NEW -> NewCommand()
+            RUN -> RunCommand()
             else -> UndefinedCommand()
         }
     }

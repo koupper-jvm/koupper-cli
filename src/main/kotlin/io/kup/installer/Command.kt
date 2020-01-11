@@ -8,7 +8,7 @@ abstract class Command {
     lateinit var name: String
     lateinit var usage: String
     lateinit var description: String
-    lateinit var arguments: List<String>
+    lateinit var arguments: Map<String, String>
 
     abstract fun execute(vararg args: String)
 
@@ -27,8 +27,18 @@ abstract class Command {
     open fun showArguments() {
         println(" ${ANSI_YELLOW_229}• Arguments:$ANSI_RESET")
 
-        for (argument in this.arguments) {
-            println("   $ANSI_GREEN_155$argument$ANSI_RESET")
+        var maxLengthOfCommand = 0
+
+        this.arguments.forEach { (commandName, _) ->
+            if (commandName.length > maxLengthOfCommand) {
+                maxLengthOfCommand = commandName.length
+            }
+        }
+
+        this.arguments.forEach { (commandName, description) ->
+            val message = "$commandName".padEnd(maxLengthOfCommand + 3)
+
+            println("   $ANSI_GREEN_155$message$ANSI_RESET$description")
         }
 
         println()
