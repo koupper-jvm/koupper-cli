@@ -1,25 +1,25 @@
 package io.kup.installer.commands
 
-import io.kup.installer.ANSIColors
 import io.kup.installer.ANSIColors.ANSI_BLACK
 import io.kup.installer.ANSIColors.ANSI_GREEN_155
 import io.kup.installer.ANSIColors.ANSI_RESET
 import io.kup.installer.ANSIColors.ANSI_YELLOW_229
 import io.kup.installer.ANSIColors.YELLOW_BACKGROUND_222
 import io.kup.installer.Command
+import io.kup.installer.commands.AvailableCommands.NEW
 import io.kup.installer.languages.JavaOption
 import io.kup.installer.languages.KotlinOption
 
 class NewCommand : Command() {
     init {
-        super.name = "new"
-        super.usage = "kup ${ANSIColors.ANSI_GREEN_155}new$ANSI_RESET"
-        super.description = "create a new resource"
-        super.arguments = emptyList()
+        super.name = NEW
+        super.usage = "kup ${ANSI_GREEN_155}$name$ANSI_RESET"
+        super.description = "Initializes a wizard to create a new resource"
+        super.arguments = emptyMap()
     }
 
     override fun name(): String {
-        return "new"
+        return NEW
     }
 
     override fun execute(vararg args: String) {
@@ -29,7 +29,7 @@ class NewCommand : Command() {
     override fun showUsage() {
         super.showUsage()
 
-        println("   kup ${ANSI_GREEN_155}new$ANSI_RESET\n")
+        println()
     }
 
     private fun askForLanguage() {
