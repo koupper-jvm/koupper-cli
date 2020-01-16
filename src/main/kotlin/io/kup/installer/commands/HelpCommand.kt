@@ -21,7 +21,7 @@ class HelpCommand : Command() {
     }
 
     override fun execute(vararg args: String) {
-        if (args.isEmpty() || args[0].isEmpty()) {
+        if (args.isEmpty()) {
             super.showDescription()
 
             super.showUsage()
