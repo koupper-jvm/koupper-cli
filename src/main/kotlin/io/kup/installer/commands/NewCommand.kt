@@ -26,12 +26,6 @@ class NewCommand : Command() {
         this.askForLanguage()
     }
 
-    override fun showUsage() {
-        super.showUsage()
-
-        println()
-    }
-
     private fun askForLanguage() {
         print(
             """
