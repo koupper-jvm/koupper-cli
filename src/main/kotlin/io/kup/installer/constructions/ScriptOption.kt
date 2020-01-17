@@ -27,7 +27,7 @@ class ScriptOption : Wizard {
 
         val currentDirectory = System.getProperty("user.dir")
 
-        print("\n${ANSI_WHITE}file created with path: $currentDirectory/$finalFileName$ANSI_RESET\n")
+        println("\n${ANSI_WHITE}file created with path: $currentDirectory/$finalFileName$ANSI_RESET\n")
 
         val scriptFile = this::class.java.classLoader.getResourceAsStream("Script.kt")
 

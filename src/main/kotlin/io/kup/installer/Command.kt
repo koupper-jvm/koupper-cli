@@ -18,6 +18,8 @@ abstract class Command {
         println(" ${ANSI_YELLOW_229}• Usage:$ANSI_RESET")
 
         println("   $usage")
+
+        println()
     }
 
     open fun showDescription() {

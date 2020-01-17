@@ -1,14 +1,21 @@
 package io.kup.installer.commands
 
 import io.kup.installer.ANSIColors
+import io.kup.installer.ANSIColors.ANSI_BLACK
+import io.kup.installer.ANSIColors.ANSI_RED
+import io.kup.installer.ANSIColors.ANSI_RESET
+import io.kup.installer.ANSIColors.ANSI_YELLOW_229
+import io.kup.installer.ANSIColors.YELLOW_BACKGROUND_222
 import io.kup.installer.Command
+import java.io.File
 import java.io.IOException
+import kotlin.system.exitProcess
 
 class RunCommand : Command() {
     init {
         super.name = "run"
         super.usage =
-            "kup ${ANSIColors.ANSI_GREEN_155}$name${ANSIColors.ANSI_RESET} [${ANSIColors.ANSI_GREEN_155}kotlinScriptName${ANSIColors.ANSI_RESET}]"
+            "kup ${ANSIColors.ANSI_GREEN_155}$name${ANSI_RESET} [${ANSIColors.ANSI_GREEN_155}kotlinScriptName${ANSI_RESET}]"
         super.description = "run a kotlin script"
         super.arguments = emptyMap()
     }
@@ -21,28 +28,51 @@ class RunCommand : Command() {
 
             val mainClassName = this.getNameOfMainClass(args[0])
 
-            try {
-                val process = Runtime.getRuntime()
-                    .exec("kotlinc $nameOfFileToCompile -include-runtime -d $jarName")
+            val kotlinFile = File(nameOfFileToCompile)
 
-                process.waitFor()
+            val jarFile = File(jarName)
+
+            try {
+                if (!kotlinFile.exists()) {
+                    println("\n${YELLOW_BACKGROUND_222}${ANSI_BLACK} The file does not exist. ${ANSI_RESET}\n")
+
+                    exitProcess(7)
+                }
+
+                if (jarFile.exists() && jarFile.lastModified() < kotlinFile.lastModified() || !jarFile.exists()) {
+                    val process = Runtime.getRuntime()
+                        .exec("kotlinc $nameOfFileToCompile -include-runtime -d $jarName")
+
+                    process.waitFor()
+
+                    val errors = process.errorStream.bufferedReader().readText()
+
+                    if (errors.isNotEmpty()) {
+                        print("$ANSI_RED$errors$ANSI_RESET")
+
+                        exitProcess(7)
+                    }
+                }
 
                 val outputExecution = Runtime.getRuntime().exec("kotlin -classpath $jarName $mainClassName")
 
                 outputExecution.waitFor()
 
-                print(outputExecution.inputStream.bufferedReader().readText())
+                val output = outputExecution.inputStream.bufferedReader().readText()
+
+                print(output)
             } catch (exception: IOException) {
                 println()
-                println("${ANSIColors.YELLOW_BACKGROUND_222} ".padEnd(80))
-                println("${ANSIColors.ANSI_BLACK} ¡Kotlin compiler is not present in your System!  ".padEnd(80))
-                println("${ANSIColors.YELLOW_BACKGROUND_222} ".padEnd(80))
+                println("$YELLOW_BACKGROUND_222 ".padEnd(80))
+                println("$ANSI_BLACK ¡Kotlin compiler is not present in your System!  ".padEnd(80))
+                println("$YELLOW_BACKGROUND_222 ".padEnd(80))
                 println(" Check out https://kotlinlang.org/docs/tutorials/command-line.html ".padEnd(69))
-                println("${ANSIColors.YELLOW_BACKGROUND_222} ".padEnd(80))
+                println("$YELLOW_BACKGROUND_222 ".padEnd(80))
                 println()
             }
         }
     }
+
 
     override fun name(): String {
         return AvailableCommands.RUN
@@ -54,7 +84,9 @@ class RunCommand : Command() {
                 return name.trim()
             }
 
-            print("\n${ANSIColors.YELLOW_BACKGROUND_222}${ANSIColors.ANSI_BLACK} The file needs to be a kotlin file. ${ANSIColors.ANSI_RESET}\n")
+            println("\n${YELLOW_BACKGROUND_222}${ANSI_BLACK} The file needs to be a kotlin file. ${ANSI_RESET}\n")
+
+            exitProcess(7)
         }
 
         return name.trim().plus(".kt")
