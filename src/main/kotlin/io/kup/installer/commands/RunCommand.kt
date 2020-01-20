@@ -69,7 +69,11 @@ class RunCommand : Command() {
                 println("$YELLOW_BACKGROUND_222 ".padEnd(80))
                 println()
             }
+
+            return
         }
+
+        println("\n${YELLOW_BACKGROUND_222}${ANSI_BLACK} Specify a kotlin file. ${ANSI_RESET}\n")
     }
 
 
