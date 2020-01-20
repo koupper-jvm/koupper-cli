@@ -4,7 +4,6 @@ import io.kup.installer.ANSIColors
 import io.kup.installer.ANSIColors.ANSI_BLACK
 import io.kup.installer.ANSIColors.ANSI_RED
 import io.kup.installer.ANSIColors.ANSI_RESET
-import io.kup.installer.ANSIColors.ANSI_YELLOW_229
 import io.kup.installer.ANSIColors.YELLOW_BACKGROUND_222
 import io.kup.installer.Command
 import java.io.File
@@ -70,7 +69,11 @@ class RunCommand : Command() {
                 println("$YELLOW_BACKGROUND_222 ".padEnd(80))
                 println()
             }
+
+            return
         }
+
+        println("\n${YELLOW_BACKGROUND_222}${ANSI_BLACK} Specify a kotlin file. ${ANSI_RESET}\n")
     }
 
 
