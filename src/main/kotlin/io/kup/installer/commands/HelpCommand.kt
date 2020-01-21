@@ -3,7 +3,6 @@ package io.kup.installer.commands
 import io.kup.installer.ANSIColors
 import io.kup.installer.ANSIColors.ANSI_GREEN_155
 import io.kup.installer.ANSIColors.ANSI_RESET
-import io.kup.installer.Command
 import io.kup.installer.CommandManager
 import io.kup.installer.commands.AvailableCommands.HELP
 import io.kup.installer.commands.AvailableCommands.commands

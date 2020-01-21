@@ -5,7 +5,6 @@ import io.kup.installer.ANSIColors.ANSI_GREEN_155
 import io.kup.installer.ANSIColors.ANSI_RESET
 import io.kup.installer.ANSIColors.ANSI_YELLOW_229
 import io.kup.installer.ANSIColors.YELLOW_BACKGROUND_222
-import io.kup.installer.Command
 import io.kup.installer.commands.AvailableCommands.NEW
 import io.kup.installer.languages.JavaOption
 import io.kup.installer.languages.KotlinOption

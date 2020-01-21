@@ -5,7 +5,6 @@ import io.kup.installer.ANSIColors.ANSI_BLACK
 import io.kup.installer.ANSIColors.ANSI_RED
 import io.kup.installer.ANSIColors.ANSI_RESET
 import io.kup.installer.ANSIColors.YELLOW_BACKGROUND_222
-import io.kup.installer.Command
 import java.io.File
 import java.io.IOException
 import kotlin.system.exitProcess

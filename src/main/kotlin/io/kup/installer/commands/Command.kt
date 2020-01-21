@@ -1,4 +1,4 @@
-package io.kup.installer
+package io.kup.installer.commands
 
 import io.kup.installer.ANSIColors.ANSI_GREEN_155
 import io.kup.installer.ANSIColors.ANSI_RESET
