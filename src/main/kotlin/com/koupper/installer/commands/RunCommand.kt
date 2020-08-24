@@ -1,10 +1,10 @@
-package io.kup.installer.commands
+package com.koupper.installer.commands
 
-import io.kup.installer.ANSIColors
-import io.kup.installer.ANSIColors.ANSI_BLACK
-import io.kup.installer.ANSIColors.ANSI_RED
-import io.kup.installer.ANSIColors.ANSI_RESET
-import io.kup.installer.ANSIColors.YELLOW_BACKGROUND_222
+import com.koupper.installer.ANSIColors
+import com.koupper.installer.ANSIColors.ANSI_BLACK
+import com.koupper.installer.ANSIColors.ANSI_RED
+import com.koupper.installer.ANSIColors.ANSI_RESET
+import com.koupper.installer.ANSIColors.YELLOW_BACKGROUND_222
 import java.io.File
 import java.io.IOException
 import kotlin.system.exitProcess

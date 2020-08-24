@@ -1,4 +1,4 @@
-package io.kup.installer
+package com.koupper.installer
 
 interface Wizard {
     fun init()

@@ -1,9 +1,9 @@
-package io.kup.installer.commands
+package com.koupper.installer.commands
 
-import io.kup.installer.ANSIColors.ANSI_GREEN_155
-import io.kup.installer.ANSIColors.ANSI_RESET
-import io.kup.installer.commands.AvailableCommands.DEFAULT
-import io.kup.installer.commands.AvailableCommands.commands
+import com.koupper.installer.ANSIColors.ANSI_GREEN_155
+import com.koupper.installer.ANSIColors.ANSI_RESET
+import com.koupper.installer.commands.AvailableCommands.DEFAULT
+import com.koupper.installer.commands.AvailableCommands.commands
 
 class DefaultCommand : Command() {
     override fun name(): String {

@@ -1,13 +1,13 @@
-package io.kup.installer.languages
+package com.koupper.installer.languages
 
-import io.kup.installer.ANSIColors.ANSI_BLACK
-import io.kup.installer.ANSIColors.ANSI_RESET
-import io.kup.installer.ANSIColors.ANSI_WHITE
-import io.kup.installer.ANSIColors.ANSI_YELLOW_229
-import io.kup.installer.ANSIColors.YELLOW_BACKGROUND_222
-import io.kup.installer.Wizard
-import io.kup.installer.constructions.ProjectOption
-import io.kup.installer.constructions.ScriptOption
+import com.koupper.installer.ANSIColors.ANSI_BLACK
+import com.koupper.installer.ANSIColors.ANSI_RESET
+import com.koupper.installer.ANSIColors.ANSI_WHITE
+import com.koupper.installer.ANSIColors.ANSI_YELLOW_229
+import com.koupper.installer.ANSIColors.YELLOW_BACKGROUND_222
+import com.koupper.installer.Wizard
+import com.koupper.installer.constructions.ProjectOption
+import com.koupper.installer.constructions.ScriptOption
 
 class KotlinOption : Wizard {
     override fun init() {

@@ -1,13 +1,13 @@
-package io.kup.installer.commands
+package com.koupper.installer.commands
 
-import io.kup.installer.ANSIColors.ANSI_BLACK
-import io.kup.installer.ANSIColors.ANSI_GREEN_155
-import io.kup.installer.ANSIColors.ANSI_RESET
-import io.kup.installer.ANSIColors.ANSI_YELLOW_229
-import io.kup.installer.ANSIColors.YELLOW_BACKGROUND_222
-import io.kup.installer.commands.AvailableCommands.NEW
-import io.kup.installer.languages.JavaOption
-import io.kup.installer.languages.KotlinOption
+import com.koupper.installer.ANSIColors.ANSI_BLACK
+import com.koupper.installer.ANSIColors.ANSI_GREEN_155
+import com.koupper.installer.ANSIColors.ANSI_RESET
+import com.koupper.installer.ANSIColors.ANSI_YELLOW_229
+import com.koupper.installer.ANSIColors.YELLOW_BACKGROUND_222
+import com.koupper.installer.commands.AvailableCommands.NEW
+import com.koupper.installer.languages.JavaOption
+import com.koupper.installer.languages.KotlinOption
 
 class NewCommand : Command() {
     init {

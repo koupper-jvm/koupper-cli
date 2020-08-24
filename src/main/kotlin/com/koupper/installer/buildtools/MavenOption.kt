@@ -1,10 +1,9 @@
-package io.kup.installer.languages
+package com.koupper.installer.buildtools
 
-import io.kup.installer.Wizard
+import com.koupper.installer.Wizard
 
-class JavaOption : Wizard {
+class MavenOption : Wizard {
     override fun init() {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
-
 }

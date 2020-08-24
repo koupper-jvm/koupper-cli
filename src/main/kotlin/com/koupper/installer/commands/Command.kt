@@ -1,8 +1,8 @@
-package io.kup.installer.commands
+package com.koupper.installer.commands
 
-import io.kup.installer.ANSIColors.ANSI_GREEN_155
-import io.kup.installer.ANSIColors.ANSI_RESET
-import io.kup.installer.ANSIColors.ANSI_YELLOW_229
+import com.koupper.installer.ANSIColors.ANSI_GREEN_155
+import com.koupper.installer.ANSIColors.ANSI_RESET
+import com.koupper.installer.ANSIColors.ANSI_YELLOW_229
 
 abstract class Command {
     lateinit var name: String

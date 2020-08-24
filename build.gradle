@@ -2,7 +2,7 @@ plugins {
     id 'org.jetbrains.kotlin.jvm' version '1.3.41'
 }
 
-group 'io.kup.installer'
+group 'com.koupper.installer'
 version '1.0-SNAPSHOT'
 
 repositories {
@@ -22,7 +22,7 @@ compileTestKotlin {
 
 jar {
     manifest {
-        attributes 'Main-Class': 'io.kup.installer.CommandManagerKt'
+        attributes 'Main-Class': 'com.koupper.installer.CommandManagerKt'
     }
     from {
         configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) }

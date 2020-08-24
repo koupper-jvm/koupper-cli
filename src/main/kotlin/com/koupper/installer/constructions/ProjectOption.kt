@@ -1,12 +1,12 @@
-package io.kup.installer.constructions
+package com.koupper.installer.constructions
 
-import io.kup.installer.ANSIColors.ANSI_BLACK
-import io.kup.installer.ANSIColors.ANSI_RESET
-import io.kup.installer.ANSIColors.ANSI_YELLOW_229
-import io.kup.installer.ANSIColors.YELLOW_BACKGROUND_222
-import io.kup.installer.Wizard
-import io.kup.installer.buildtools.GradleOption
-import io.kup.installer.buildtools.MavenOption
+import com.koupper.installer.ANSIColors.ANSI_BLACK
+import com.koupper.installer.ANSIColors.ANSI_RESET
+import com.koupper.installer.ANSIColors.ANSI_YELLOW_229
+import com.koupper.installer.ANSIColors.YELLOW_BACKGROUND_222
+import com.koupper.installer.Wizard
+import com.koupper.installer.buildtools.GradleOption
+import com.koupper.installer.buildtools.MavenOption
 
 class ProjectOption : Wizard {
     override fun init() {

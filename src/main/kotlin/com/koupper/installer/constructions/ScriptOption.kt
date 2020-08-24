@@ -1,11 +1,11 @@
-package io.kup.installer.constructions
+package com.koupper.installer.constructions
 
-import io.kup.installer.ANSIColors.ANSI_BLACK
-import io.kup.installer.ANSIColors.ANSI_RESET
-import io.kup.installer.ANSIColors.ANSI_WHITE
-import io.kup.installer.ANSIColors.ANSI_YELLOW_229
-import io.kup.installer.ANSIColors.YELLOW_BACKGROUND_222
-import io.kup.installer.Wizard
+import com.koupper.installer.ANSIColors.ANSI_BLACK
+import com.koupper.installer.ANSIColors.ANSI_RESET
+import com.koupper.installer.ANSIColors.ANSI_WHITE
+import com.koupper.installer.ANSIColors.ANSI_YELLOW_229
+import com.koupper.installer.ANSIColors.YELLOW_BACKGROUND_222
+import com.koupper.installer.Wizard
 import java.io.File
 import java.io.InputStream
 

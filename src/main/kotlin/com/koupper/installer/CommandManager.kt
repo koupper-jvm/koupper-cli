@@ -1,9 +1,9 @@
-package io.kup.installer
+package com.koupper.installer
 
-import io.kup.installer.commands.*
-import io.kup.installer.commands.AvailableCommands.HELP
-import io.kup.installer.commands.AvailableCommands.NEW
-import io.kup.installer.commands.AvailableCommands.RUN
+import com.koupper.installer.commands.*
+import com.koupper.installer.commands.AvailableCommands.HELP
+import com.koupper.installer.commands.AvailableCommands.NEW
+import com.koupper.installer.commands.AvailableCommands.RUN
 
 class CommandManager {
 

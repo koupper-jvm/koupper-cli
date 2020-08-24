@@ -1,4 +1,4 @@
-package io.kup.installer
+package com.koupper.installer
 
 object ANSIColors {
     const val ANSI_WHITE = "\u001B[38;5;15m"
