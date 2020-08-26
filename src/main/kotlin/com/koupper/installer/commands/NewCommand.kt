@@ -12,7 +12,7 @@ import com.koupper.installer.languages.KotlinOption
 class NewCommand : Command() {
     init {
         super.name = NEW
-        super.usage = "kup ${ANSI_GREEN_155}$name$ANSI_RESET"
+        super.usage = "koupper ${ANSI_GREEN_155}$name$ANSI_RESET"
         super.description = "Initializes a wizard to create a new resource"
         super.arguments = emptyMap()
     }

@@ -14,7 +14,7 @@ class HelpCommand : Command() {
 
     init {
         super.name = HELP
-        super.usage = "kup ${ANSI_GREEN_155}$name$ANSI_RESET [${ANSI_GREEN_155}command$ANSI_RESET]"
+        super.usage = "koupper ${ANSI_GREEN_155}$name$ANSI_RESET [${ANSI_GREEN_155}command$ANSI_RESET]"
         super.description = "Show the help for a command"
         super.arguments = commands()
     }

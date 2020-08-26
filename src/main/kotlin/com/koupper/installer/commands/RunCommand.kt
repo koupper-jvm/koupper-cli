@@ -13,7 +13,7 @@ class RunCommand : Command() {
     init {
         super.name = "run"
         super.usage =
-            "kup ${ANSIColors.ANSI_GREEN_155}$name${ANSI_RESET} [${ANSIColors.ANSI_GREEN_155}kotlinScriptName${ANSI_RESET}]"
+            "koupper ${ANSIColors.ANSI_GREEN_155}$name${ANSI_RESET} [${ANSIColors.ANSI_GREEN_155}kotlinScriptName${ANSI_RESET}]"
         super.description = "run a kotlin script"
         super.arguments = emptyMap()
     }
