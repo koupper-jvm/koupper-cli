@@ -20,7 +20,7 @@ class CommandManager {
             return
         }
 
-        val command = getCommandObjectFrom(arg[0])
+        val command = getCommandByName(arg[0])
 
         if (command is UndefinedCommand) {
             command.execute(arg[0])
@@ -28,12 +28,12 @@ class CommandManager {
             return
         }
 
-        val args = this.getCommandArgsFrom(arg)
+        val args = this.getArgsFrom(arg)
 
         command.execute(*args)
     }
 
-    fun getCommandObjectFrom(input: String): Command {
+    fun getCommandByName(input: String): Command {
         return when (input) {
             HELP -> HelpCommand()
             NEW -> NewCommand()
@@ -46,7 +46,7 @@ class CommandManager {
         return input == "-v" || input == "--v" || input == "--version"
     }
 
-    private fun getCommandArgsFrom(arg: Array<String>): Array<String> {
+    private fun getArgsFrom(arg: Array<String>): Array<String> {
         return if (arg.size > 1) arg.sliceArray(1 until arg.size) else emptyArray()
     }
 }

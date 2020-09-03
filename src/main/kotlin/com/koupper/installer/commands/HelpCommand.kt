@@ -30,7 +30,7 @@ class HelpCommand : Command() {
             return
         }
 
-        val command = CommandManager().getCommandObjectFrom(args[0])
+        val command = CommandManager().getCommandByName(args[0])
 
         if (command is UndefinedCommand) {
             command.execute(args[0])

@@ -15,7 +15,7 @@ abstract class Command {
     abstract fun name(): String
 
     open fun showUsage() {
-        println(" ${ANSI_YELLOW_229}• Usage:$ANSI_RESET")
+        println(" ${ANSI_YELLOW_229}- Usage:$ANSI_RESET")
 
         println("   $usage")
 
@@ -23,11 +23,11 @@ abstract class Command {
     }
 
     open fun showDescription() {
-        println("\n $ANSI_GREEN_155>>$ANSI_RESET$ANSI_YELLOW_229 $description \n")
+        println("\n  $ANSI_GREEN_155$ANSI_RESET$ANSI_YELLOW_229 $description \n")
     }
 
     open fun showArguments() {
-        println(" ${ANSI_YELLOW_229}• Arguments:$ANSI_RESET")
+        println(" ${ANSI_YELLOW_229}- Commands:$ANSI_RESET")
 
         var maxLengthOfCommand = 0
 
