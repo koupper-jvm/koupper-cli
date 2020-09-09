@@ -46,10 +46,12 @@ class RunCommand : Command() {
 
         val directories = Files.list(Paths.get(".")).collect(Collectors.partitioningBy { Files.isDirectory(it) })
 
-        val initFile = directories[false]?.filter { it.toString() == "./init.kts" }
+        val initFile = directories[false]?.filter {
+            it.toString() == "./init.kts"
+        }
 
         if (initFile?.isEmpty()!!)
-            println("\n${ANSI_YELLOW_229} There is no 'init.kts' file, create one using [create] command.\n")
+            println("\n${ANSI_YELLOW_229} There is no 'init.kts' file, create one using [koupper new file:init] command.\n")
         else {
             val finalInitPath = Paths.get("").toAbsolutePath().toString() + "/init.kts"
 

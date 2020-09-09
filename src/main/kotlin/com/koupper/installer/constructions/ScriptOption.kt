@@ -29,19 +29,17 @@ class ScriptOption : Wizard {
 
         println("\n${ANSI_WHITE}file created with path: $currentDirectory/$finalFileName$ANSI_RESET\n")
 
-        val scriptFile = this::class.java.classLoader.getResourceAsStream("Script.kt")
-
-        scriptFile.toFile("$currentDirectory/$finalFileName")
+        this::class.java.classLoader.getResourceAsStream("script.txt").toFile("$currentDirectory/$finalFileName")
     }
 
     private fun sanitizeFileName(fileName: String): String {
-        val hasExtension = fileName.contains(".kt")
+        val hasExtension = fileName.contains(".kts")
 
         if (hasExtension) {
             return fileName
         }
 
-        return fileName.plus(".kt")
+        return fileName.plus(".kts")
     }
 
     private fun InputStream.toFile(path: String) {

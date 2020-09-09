@@ -8,6 +8,8 @@ import com.koupper.installer.ANSIColors.YELLOW_BACKGROUND_222
 import com.koupper.installer.commands.AvailableCommands.NEW
 import com.koupper.installer.languages.JavaOption
 import com.koupper.installer.languages.KotlinOption
+import java.io.File
+import java.io.InputStream
 
 class NewCommand : Command() {
     init {
@@ -22,7 +24,30 @@ class NewCommand : Command() {
     }
 
     override fun execute(vararg args: String) {
-        this.askForLanguage()
+        if (args.isNotEmpty()) {
+            val currentDirectory = System.getProperty("user.dir")
+
+            if ("file:init" in args[0]) {
+
+                this::class.java.classLoader.getResourceAsStream("init.txt").toFile("$currentDirectory/init.kts")
+
+                return
+            }
+
+            if (".kts" in args[0].trim()) {
+                this::class.java.classLoader.getResourceAsStream("script.txt").toFile("$currentDirectory/" + args[0])
+
+                return
+            }
+
+            println("\n ${ANSI_YELLOW_229}The file should contain the 'kts' extension.$ANSI_RESET\n")
+        } else {
+            this.askForLanguage()
+        }
+    }
+
+    private fun InputStream.toFile(path: String) {
+        File(path).outputStream().use { this.copyTo(it) }
     }
 
     private fun askForLanguage() {
