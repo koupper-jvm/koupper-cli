@@ -28,7 +28,6 @@ class NewCommand : Command() {
             val currentDirectory = System.getProperty("user.dir")
 
             if ("file:init" in args[0]) {
-
                 this::class.java.classLoader.getResourceAsStream("init.txt").toFile("$currentDirectory/init.kts")
 
                 return
@@ -36,14 +35,16 @@ class NewCommand : Command() {
 
             if (".kts" in args[0].trim()) {
                 this::class.java.classLoader.getResourceAsStream("script.txt").toFile("$currentDirectory/" + args[0])
-
-                return
+            } else {
+                println("\n ${ANSI_YELLOW_229}The file should contain the 'kts' extension.$ANSI_RESET\n")
             }
-
-            println("\n ${ANSI_YELLOW_229}The file should contain the 'kts' extension.$ANSI_RESET\n")
         } else {
             this.askForLanguage()
         }
+
+        println("\n ${ANSI_YELLOW_229}An file .env was created to keep the scripts configurations$ANSI_RESET\n")
+
+        File(".env").createNewFile()
     }
 
     private fun InputStream.toFile(path: String) {
