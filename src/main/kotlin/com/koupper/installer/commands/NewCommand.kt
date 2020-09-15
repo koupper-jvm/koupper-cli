@@ -42,9 +42,13 @@ class NewCommand : Command() {
             this.askForLanguage()
         }
 
-        println("\n ${ANSI_YELLOW_229}An file .env was created to keep the scripts configurations$ANSI_RESET\n")
+        val env = File(".env")
 
-        File(".env").createNewFile()
+        if (!env.exists()) {
+            println("\n ${ANSI_YELLOW_229}An file .env was created to keep the scripts configurations$ANSI_RESET\n")
+
+            File(".env").createNewFile()
+        }
     }
 
     private fun InputStream.toFile(path: String) {

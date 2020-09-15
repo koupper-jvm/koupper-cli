@@ -60,9 +60,9 @@ class RunCommand : Command() {
     }
 
     private fun execute(fileName: String, params: String = "EMPTY_PARAMS") {
-        var finalInitPath = ""
+        var finalFilePath = ""
 
-        finalInitPath += if (isSingleFileName(fileName)) {
+        finalFilePath += if (isSingleFileName(fileName)) {
             Paths.get("").toAbsolutePath().toString() + "/$fileName "
         } else {
             fileName
@@ -72,7 +72,7 @@ class RunCommand : Command() {
             val userPath = System.getProperty("user.home")
 
             val process = Runtime.getRuntime()
-                    .exec("$userPath/.koupper/helpers/octopusBootstrapper.sh $finalInitPath $params")
+                    .exec("$userPath/.koupper/helpers/octopusBootstrapper.sh $finalFilePath $params")
 
             process.waitFor()
 
