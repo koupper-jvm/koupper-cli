@@ -1,3 +1,3 @@
-# KUp-installer
-KUp installer is an engine that allow you  create and manage your projects build in Kotlin and Java languages.
+# Koupper Installer
+Is an assistant for your local host environment bonded to Copper-Architecture.
 
