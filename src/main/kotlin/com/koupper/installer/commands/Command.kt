@@ -23,7 +23,7 @@ abstract class Command {
     }
 
     open fun showDescription() {
-        println("\n  $ANSI_GREEN_155$ANSI_RESET$ANSI_YELLOW_229 $description \n")
+        println("\n  $ANSI_YELLOW_229 $description \n")
     }
 
     open fun showArguments() {

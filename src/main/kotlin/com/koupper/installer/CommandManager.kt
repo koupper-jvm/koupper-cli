@@ -6,7 +6,6 @@ import com.koupper.installer.commands.AvailableCommands.NEW
 import com.koupper.installer.commands.AvailableCommands.RUN
 
 class CommandManager {
-
     fun initWith(arg: Array<String>) {
         if (arg.isEmpty()) {
             DefaultCommand().execute()

@@ -37,6 +37,8 @@ class NewCommand : Command() {
                 this::class.java.classLoader.getResourceAsStream("script.txt").toFile("$currentDirectory/" + args[0])
             } else {
                 println("\n ${ANSI_YELLOW_229}The file should contain the 'kts' extension.$ANSI_RESET\n")
+
+                return
             }
         } else {
             this.askForLanguage()
