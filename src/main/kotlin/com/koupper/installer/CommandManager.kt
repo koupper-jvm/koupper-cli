@@ -1,6 +1,7 @@
 package com.koupper.installer
 
 import com.koupper.installer.commands.*
+import com.koupper.installer.commands.AvailableCommands.BUILD
 import com.koupper.installer.commands.AvailableCommands.HELP
 import com.koupper.installer.commands.AvailableCommands.NEW
 import com.koupper.installer.commands.AvailableCommands.RUN
@@ -34,6 +35,7 @@ class CommandManager {
 
     fun getCommandByName(input: String): Command {
         return when (input) {
+            BUILD -> BuildCommand()
             HELP -> HelpCommand()
             NEW -> NewCommand()
             RUN -> RunCommand()

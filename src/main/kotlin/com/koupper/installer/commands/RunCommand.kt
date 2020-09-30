@@ -3,6 +3,7 @@ package com.koupper.installer.commands
 import com.koupper.installer.ANSIColors
 import com.koupper.installer.ANSIColors.ANSI_RED
 import com.koupper.installer.ANSIColors.ANSI_RESET
+import com.koupper.installer.ANSIColors.ANSI_WHITE
 import com.koupper.installer.ANSIColors.ANSI_YELLOW_229
 import java.io.IOException
 import java.nio.file.Files
@@ -51,7 +52,7 @@ class RunCommand : Command() {
         }
 
         if (initFile?.isEmpty()!!)
-            println("\n${ANSI_YELLOW_229} There is no 'init.kts' file, create one using [koupper new file:init] command.\n")
+            println("\n${ANSI_YELLOW_229} No 'init.kts' file exist. Create one typing -> ${ANSI_WHITE}koupper new file:init${ANSI_WHITE}\n")
         else {
             val finalInitPath = Paths.get("").toAbsolutePath().toString() + "/init.kts"
 
