@@ -10,8 +10,8 @@ object AvailableCommands {
 
     fun commands(): Map<String, String> = mapOf(
         NEW to "Create a new resource",
-        HELP to "Show the information of a command",
+        HELP to "Show a description for the specified command",
         RUN to "Run a kotlin script",
-        BUILD to "Build a deployable script structure"
+        BUILD to "Build a deployable project model"
     )
 }
