@@ -13,7 +13,7 @@ class DefaultCommand : Command() {
     init {
         super.name = "koupper"
         super.usage = "$name [${ANSI_GREEN_155}command$ANSI_RESET]"
-        super.description = "koupper installer ${ANSI_GREEN_155}1.0.0$ANSI_RESET"
+        super.description = "koupper installer ${ANSI_GREEN_155}1.5.1$ANSI_RESET"
         super.arguments = commands()
     }
 
