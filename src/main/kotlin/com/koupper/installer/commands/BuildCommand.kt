@@ -24,7 +24,7 @@ class BuildCommand : Command() {
             val currentDirectory = System.getProperty("user.dir")
 
             if (!File("$currentDirectory/init.kts").exists()) {
-                println("\n ${ANSIColors.ANSI_YELLOW_229}No init file exist. Create one typing -> ${ANSI_WHITE}koupper new file:init${ANSIColors.ANSI_RESET}\n")
+                println("\n ${ANSIColors.ANSI_YELLOW_229}'init.kts' not exist. Create one typing: ${ANSI_WHITE}koupper new file:init${ANSIColors.ANSI_RESET}\n")
 
                 return
             }

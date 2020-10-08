@@ -52,7 +52,7 @@ class RunCommand : Command() {
         }
 
         if (initFile?.isEmpty()!!)
-            println("\n${ANSI_YELLOW_229} No 'init.kts' file exist. Create one typing -> ${ANSI_WHITE}koupper new file:init${ANSI_WHITE}\n")
+            println("\n ${ANSI_YELLOW_229}'init.kts' not exist. Create one typing: ${ANSI_WHITE}koupper new file:init${ANSI_WHITE}\n")
         else {
             val finalInitPath = Paths.get("").toAbsolutePath().toString() + "/init.kts"
 
