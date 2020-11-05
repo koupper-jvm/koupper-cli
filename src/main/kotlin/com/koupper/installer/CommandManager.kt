@@ -5,9 +5,15 @@ import com.koupper.installer.commands.AvailableCommands.BUILD
 import com.koupper.installer.commands.AvailableCommands.HELP
 import com.koupper.installer.commands.AvailableCommands.NEW
 import com.koupper.installer.commands.AvailableCommands.RUN
+import java.io.File
+import java.io.IOException
+import java.net.URL
+import kotlin.system.exitProcess
 
 class CommandManager {
     fun initWith(arg: Array<String>) {
+        this.checkForUpdates()
+
         if (arg.isEmpty()) {
             DefaultCommand().execute()
 
@@ -31,6 +37,51 @@ class CommandManager {
         val args = this.getArgsFrom(arg)
 
         command.execute(*args)
+    }
+
+    private fun checkForUpdates() {
+        try {
+            val userPath = System.getProperty("user.home")
+
+            val process = Runtime.getRuntime()
+                    .exec("$userPath/.koupper/helpers/octopusBootstrapper.sh UPDATING_CHECK")
+
+            process.waitFor()
+
+            val errors = process.errorStream.bufferedReader().readText()
+
+            if (errors.isNotEmpty()) {
+                print("${ANSIColors.ANSI_RED}$errors${ANSIColors.ANSI_RESET}")
+
+                exitProcess(7)
+            }
+
+            val output = process.inputStream.bufferedReader().readText()
+
+            if (output == "AVAILABLE_UPDATES") {
+                print("updates are available, Would you like apply them now? [y/n] ")
+
+                when (readLine()) {
+                    "y" , "Y" -> {
+                        val content = URL("https://lib-installer.s3.amazonaws.com/updateme.txt").readText()
+
+                        val file = File("$userPath/.koupper/helpers/updateme.kts")
+                        file.writeText(content)
+                        file.createNewFile()
+                        file.setExecutable(true)
+                        file.setReadable(true)
+                        file.setWritable(false)
+
+                        exitProcess(0)
+                    }
+                    else -> return
+                }
+            }
+        } catch (exception: IOException) {
+            println()
+            println(ANSIColors.ANSI_RED + exception.printStackTrace())
+            println()
+        }
     }
 
     fun getCommandByName(input: String): Command {
