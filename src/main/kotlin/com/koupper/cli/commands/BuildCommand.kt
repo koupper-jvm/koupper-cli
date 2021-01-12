@@ -1,10 +1,10 @@
-package com.koupper.installer.commands
+package com.koupper.cli.commands
 
-import com.koupper.installer.ANSIColors
-import com.koupper.installer.ANSIColors.ANSI_WHITE
-import com.koupper.installer.commands.AvailableCommands.BUILD
-import com.koupper.installer.commands.AvailableCommands.HELP
-import com.koupper.installer.commands.AvailableCommands.commands
+import com.koupper.cli.ANSIColors
+import com.koupper.cli.ANSIColors.ANSI_WHITE
+import com.koupper.cli.commands.AvailableCommands.BUILD
+import com.koupper.cli.commands.AvailableCommands.HELP
+import com.koupper.cli.commands.AvailableCommands.commands
 import java.io.File
 
 class BuildCommand : Command() {

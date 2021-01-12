@@ -1,10 +1,10 @@
-package com.koupper.installer
+package com.koupper.cli
 
-import com.koupper.installer.commands.*
-import com.koupper.installer.commands.AvailableCommands.BUILD
-import com.koupper.installer.commands.AvailableCommands.HELP
-import com.koupper.installer.commands.AvailableCommands.NEW
-import com.koupper.installer.commands.AvailableCommands.RUN
+import com.koupper.cli.commands.*
+import com.koupper.cli.commands.AvailableCommands.BUILD
+import com.koupper.cli.commands.AvailableCommands.HELP
+import com.koupper.cli.commands.AvailableCommands.NEW
+import com.koupper.cli.commands.AvailableCommands.RUN
 import java.io.File
 import java.io.IOException
 import java.net.URL

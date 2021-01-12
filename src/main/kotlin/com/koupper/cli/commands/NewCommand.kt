@@ -1,13 +1,13 @@
-package com.koupper.installer.commands
+package com.koupper.cli.commands
 
-import com.koupper.installer.ANSIColors.ANSI_BLACK
-import com.koupper.installer.ANSIColors.ANSI_GREEN_155
-import com.koupper.installer.ANSIColors.ANSI_RESET
-import com.koupper.installer.ANSIColors.ANSI_YELLOW_229
-import com.koupper.installer.ANSIColors.YELLOW_BACKGROUND_222
-import com.koupper.installer.commands.AvailableCommands.NEW
-import com.koupper.installer.languages.JavaOption
-import com.koupper.installer.languages.KotlinOption
+import com.koupper.cli.ANSIColors.ANSI_BLACK
+import com.koupper.cli.ANSIColors.ANSI_GREEN_155
+import com.koupper.cli.ANSIColors.ANSI_RESET
+import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
+import com.koupper.cli.ANSIColors.YELLOW_BACKGROUND_222
+import com.koupper.cli.commands.AvailableCommands.NEW
+import com.koupper.cli.languages.JavaOption
+import com.koupper.cli.languages.KotlinOption
 import java.io.File
 import java.io.InputStream
 
