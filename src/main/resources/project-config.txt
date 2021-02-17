@@ -1,0 +1,8 @@
+import com.koupper.octopus.managers.ProjectManager
+
+val init: (ProjectManager) -> ProjectManager = {
+    it.buildFrom("{PROJECT_NAME}", mapOf(
+        "version" to "{VERSION}",
+        "package" to "{PACKAGE}"
+    ))
+}
