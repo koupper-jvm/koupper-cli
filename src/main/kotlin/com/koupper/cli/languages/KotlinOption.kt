@@ -11,11 +11,8 @@ import com.koupper.cli.constructions.ScriptOption
 
 class KotlinOption : Wizard {
     override fun init() {
-        print("\n${ANSI_WHITE}language: Kotlin$ANSI_RESET")
-
         print(
             """
-
 
                 Create a
                 $ANSI_YELLOW_229
