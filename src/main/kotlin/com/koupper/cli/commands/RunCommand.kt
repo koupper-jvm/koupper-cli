@@ -5,7 +5,7 @@ import com.koupper.cli.ANSIColors.ANSI_RED
 import com.koupper.cli.ANSIColors.ANSI_RESET
 import com.koupper.cli.ANSIColors.ANSI_WHITE
 import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
-import java.io.IOException
+import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.stream.Collectors
@@ -52,7 +52,7 @@ class RunCommand : Command() {
         }
 
         if (initFile?.isEmpty()!!)
-            println("\n ${ANSI_YELLOW_229}'init.kts' not exist. Create one typing: ${ANSI_WHITE}koupper new file:init${ANSI_WHITE}\n")
+            println("\n ${ANSI_WHITE}'init.kts' not exist. Create one typing: ${ANSI_YELLOW_229}koupper new file:init${ANSI_WHITE} or specify a script name.\n")
         else {
             val finalInitPath = Paths.get("").toAbsolutePath().toString() + "/init.kts"
 
@@ -69,30 +69,14 @@ class RunCommand : Command() {
             fileName
         }.trim()
 
-        try {
-            val userPath = System.getProperty("user.home")
+        val userPath = System.getProperty("user.home")
 
-            val process = Runtime.getRuntime()
-                    .exec("$userPath/.koupper/helpers/octopusBootstrapper.sh $finalFilePath $params")
-
-            process.waitFor()
-
-            val errors = process.errorStream.bufferedReader().readText()
-
-            if (errors.isNotEmpty()) {
-                print("$ANSI_RED$errors$ANSI_RESET")
-
-                exitProcess(7)
-            }
-
-            val output = process.inputStream.bufferedReader().readText()
-
-            print(output)
-        } catch (exception: IOException) {
-            println()
-            println(ANSI_RED + exception.printStackTrace())
-            println()
-        }
+        val file = File("$userPath/.koupper/helpers/octopus-parameters.txt")
+        file.writeText("$finalFilePath $params")
+        file.createNewFile()
+        file.setExecutable(true)
+        file.setReadable(true)
+        file.setWritable(true)
     }
 
     override fun name(): String {
