@@ -1,4 +1,4 @@
-package com.koupper.installer
+package com.koupper.cli
 
 object ANSIColors {
     const val ANSI_WHITE = "\u001B[38;5;15m"

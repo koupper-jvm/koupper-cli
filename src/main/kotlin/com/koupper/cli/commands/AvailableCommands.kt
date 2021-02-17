@@ -1,4 +1,4 @@
-package com.koupper.installer.commands
+package com.koupper.cli.commands
 
 object AvailableCommands {
     const val NEW = "new"

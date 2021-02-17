@@ -1,10 +1,10 @@
-package com.koupper.installer.commands
+package com.koupper.cli.commands
 
-import com.koupper.installer.ANSIColors
-import com.koupper.installer.ANSIColors.ANSI_RED
-import com.koupper.installer.ANSIColors.ANSI_RESET
-import com.koupper.installer.ANSIColors.ANSI_WHITE
-import com.koupper.installer.ANSIColors.ANSI_YELLOW_229
+import com.koupper.cli.ANSIColors
+import com.koupper.cli.ANSIColors.ANSI_RED
+import com.koupper.cli.ANSIColors.ANSI_RESET
+import com.koupper.cli.ANSIColors.ANSI_WHITE
+import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Paths

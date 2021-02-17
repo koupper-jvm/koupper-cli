@@ -1,13 +1,13 @@
-package com.koupper.installer.languages
+package com.koupper.cli.languages
 
-import com.koupper.installer.ANSIColors.ANSI_BLACK
-import com.koupper.installer.ANSIColors.ANSI_RESET
-import com.koupper.installer.ANSIColors.ANSI_WHITE
-import com.koupper.installer.ANSIColors.ANSI_YELLOW_229
-import com.koupper.installer.ANSIColors.YELLOW_BACKGROUND_222
-import com.koupper.installer.Wizard
-import com.koupper.installer.constructions.ProjectOption
-import com.koupper.installer.constructions.ScriptOption
+import com.koupper.cli.ANSIColors.ANSI_BLACK
+import com.koupper.cli.ANSIColors.ANSI_RESET
+import com.koupper.cli.ANSIColors.ANSI_WHITE
+import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
+import com.koupper.cli.ANSIColors.YELLOW_BACKGROUND_222
+import com.koupper.cli.Wizard
+import com.koupper.cli.constructions.ProjectOption
+import com.koupper.cli.constructions.ScriptOption
 
 class KotlinOption : Wizard {
     override fun init() {

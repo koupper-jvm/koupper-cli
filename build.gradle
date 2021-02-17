@@ -2,8 +2,8 @@ plugins {
     id 'org.jetbrains.kotlin.jvm' version '1.3.41'
 }
 
-group 'com.koupper.installer'
-version '2.0.0'
+group 'com.koupper.cli'
+version '3.0.0'
 
 repositories {
     mavenCentral()
@@ -16,7 +16,7 @@ dependencies {
 
 jar {
     manifest {
-        attributes 'Main-Class': 'com.koupper.installer.CommandManagerKt'
+        attributes 'Main-Class': 'com.koupper.cli.CommandManagerKt'
     }
     from {
         configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) }

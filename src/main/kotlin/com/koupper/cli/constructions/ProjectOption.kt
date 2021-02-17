@@ -1,12 +1,12 @@
-package com.koupper.installer.constructions
+package com.koupper.cli.constructions
 
-import com.koupper.installer.ANSIColors.ANSI_BLACK
-import com.koupper.installer.ANSIColors.ANSI_RESET
-import com.koupper.installer.ANSIColors.ANSI_YELLOW_229
-import com.koupper.installer.ANSIColors.YELLOW_BACKGROUND_222
-import com.koupper.installer.Wizard
-import com.koupper.installer.buildtools.GradleOption
-import com.koupper.installer.buildtools.MavenOption
+import com.koupper.cli.ANSIColors.ANSI_BLACK
+import com.koupper.cli.ANSIColors.ANSI_RESET
+import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
+import com.koupper.cli.ANSIColors.YELLOW_BACKGROUND_222
+import com.koupper.cli.Wizard
+import com.koupper.cli.buildtools.GradleOption
+import com.koupper.cli.buildtools.MavenOption
 
 class ProjectOption : Wizard {
     override fun init() {

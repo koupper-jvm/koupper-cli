@@ -1,9 +1,9 @@
-package com.koupper.installer.commands
+package com.koupper.cli.commands
 
-import com.koupper.installer.ANSIColors.ANSI_RESET
-import com.koupper.installer.ANSIColors.ANSI_WHITE
-import com.koupper.installer.ANSIColors.RED_BACKGROUND_203
-import com.koupper.installer.commands.AvailableCommands.UNDEFINED
+import com.koupper.cli.ANSIColors.ANSI_RESET
+import com.koupper.cli.ANSIColors.ANSI_WHITE
+import com.koupper.cli.ANSIColors.RED_BACKGROUND_203
+import com.koupper.cli.commands.AvailableCommands.UNDEFINED
 
 class UndefinedCommand : Command() {
     override fun name(): String {

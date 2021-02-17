@@ -1,9 +1,10 @@
-package com.koupper.installer.buildtools
+package com.koupper.cli.languages
 
-import com.koupper.installer.Wizard
+import com.koupper.cli.Wizard
 
-class GradleOption : Wizard {
+class JavaOption : Wizard {
     override fun init() {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
+
 }

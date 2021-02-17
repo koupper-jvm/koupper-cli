@@ -1,11 +1,11 @@
-package com.koupper.installer.commands
+package com.koupper.cli.commands
 
-import com.koupper.installer.ANSIColors
-import com.koupper.installer.ANSIColors.ANSI_GREEN_155
-import com.koupper.installer.ANSIColors.ANSI_RESET
-import com.koupper.installer.CommandManager
-import com.koupper.installer.commands.AvailableCommands.HELP
-import com.koupper.installer.commands.AvailableCommands.commands
+import com.koupper.cli.ANSIColors
+import com.koupper.cli.ANSIColors.ANSI_GREEN_155
+import com.koupper.cli.ANSIColors.ANSI_RESET
+import com.koupper.cli.CommandManager
+import com.koupper.cli.commands.AvailableCommands.HELP
+import com.koupper.cli.commands.AvailableCommands.commands
 
 class HelpCommand : Command() {
     override fun name(): String {
