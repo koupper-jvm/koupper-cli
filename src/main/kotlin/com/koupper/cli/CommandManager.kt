@@ -70,7 +70,7 @@ class CommandManager {
                         file.createNewFile()
                         file.setExecutable(true)
                         file.setReadable(true)
-                        file.setWritable(false)
+                        file.setWritable(true)
 
                         exitProcess(0)
                     }
