@@ -42,6 +42,8 @@ class NewCommand : Command() {
             }
         } else {
             this.askForLanguage()
+
+            return
         }
 
         val env = File(".env")
