@@ -1,5 +1,6 @@
 package com.koupper.cli.commands
 
+import com.koupper.cli.ANSIColors
 import com.koupper.cli.ANSIColors.ANSI_BLACK
 import com.koupper.cli.ANSIColors.ANSI_GREEN_155
 import com.koupper.cli.ANSIColors.ANSI_RESET
@@ -14,8 +15,8 @@ import java.io.InputStream
 class NewCommand : Command() {
     init {
         super.name = NEW
-        super.usage = "koupper ${ANSI_GREEN_155}$name$ANSI_RESET"
-        super.description = "Initializes a wizard to create a new resource"
+        super.usage = "koupper ${ANSI_GREEN_155}$name$ANSI_RESET [${ANSIColors.ANSI_GREEN_155}module${ANSI_RESET}|${ANSIColors.ANSI_GREEN_155}environment${ANSI_RESET}]"
+        super.description = "create a module or environment"
         super.arguments = emptyMap()
     }
 
