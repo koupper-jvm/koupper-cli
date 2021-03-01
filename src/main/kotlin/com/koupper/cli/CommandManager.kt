@@ -10,7 +10,7 @@ import java.net.URL
 import kotlin.system.exitProcess
 
 class CommandManager {
-    fun initWith(arg: Array<String>) {
+    fun process(arg: Array<String>) {
         this.checkForUpdates()
 
         if (arg.isEmpty()) {
@@ -102,5 +102,5 @@ class CommandManager {
 }
 
 fun main(args: Array<String>) {
-    CommandManager().initWith(args)
+    CommandManager().process(args)
 }
