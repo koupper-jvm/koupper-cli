@@ -1,7 +1,6 @@
 package com.koupper.cli
 
 import com.koupper.cli.commands.*
-import com.koupper.cli.commands.AvailableCommands.BUILD
 import com.koupper.cli.commands.AvailableCommands.HELP
 import com.koupper.cli.commands.AvailableCommands.NEW
 import com.koupper.cli.commands.AvailableCommands.RUN
@@ -86,7 +85,6 @@ class CommandManager {
 
     fun getCommandByName(input: String): Command {
         return when (input) {
-            BUILD -> BuildCommand()
             HELP -> HelpCommand()
             NEW -> NewCommand()
             RUN -> RunCommand()

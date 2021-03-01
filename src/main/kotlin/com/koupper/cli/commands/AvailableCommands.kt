@@ -9,9 +9,8 @@ object AvailableCommands {
     const val DEFAULT = "default"
 
     fun commands(): Map<String, String> = mapOf(
-        NEW to "Create a new resource",
-        HELP to "Show a description for the specified command",
-        RUN to "Run a kotlin script",
-        BUILD to "Build a deployable project model"
+        NEW to "Creates a module or environment",
+        HELP to "Shows the commands description",
+        RUN to "Run a kotlin script"
     )
 }
