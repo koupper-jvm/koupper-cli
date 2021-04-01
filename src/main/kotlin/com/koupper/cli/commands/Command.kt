@@ -9,6 +9,7 @@ abstract class Command {
     lateinit var usage: String
     lateinit var description: String
     lateinit var arguments: Map<String, String>
+    lateinit var additionalInformation: String
 
     abstract fun execute(vararg args: String)
 
@@ -18,8 +19,6 @@ abstract class Command {
         println(" ${ANSI_YELLOW_229}- Usage:$ANSI_RESET")
 
         println("   $usage")
-
-        println()
     }
 
     open fun showDescription() {
@@ -38,11 +37,15 @@ abstract class Command {
         }
 
         this.arguments.forEach { (commandName, description) ->
-            val message = "$commandName".padEnd(maxLengthOfCommand + 3)
+            val message = commandName.padEnd(maxLengthOfCommand + 3)
 
             println("   $ANSI_GREEN_155$message$ANSI_RESET$description")
         }
 
         println()
+    }
+
+    open fun showAdditionalInformation() {
+        println("$ANSI_YELLOW_229 $additionalInformation")
     }
 }

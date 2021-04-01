@@ -7,12 +7,12 @@ import java.io.File
 import java.nio.file.Paths
 
 class GradleOption : Wizard {
-    private lateinit var projectName: String
+    private lateinit var moduleName: String
     private lateinit var version: String
     private lateinit var `package`: String
 
-    override fun init() {
-        this.askForProjectName()
+    override fun init(args: Map<String, String>) {
+        this.askForModuleName()
 
         this.askForVersion()
 
@@ -21,27 +21,27 @@ class GradleOption : Wizard {
         this.requestCreation()
     }
 
-    private fun askForProjectName() {
+    private fun askForModuleName() {
         do {
             print(
                     """
             
-                Project name: 
+                Module name: 
             """.trimIndent()
             )
 
-            this.projectName = readLine() ?: ""
+            this.moduleName = readLine() ?: ""
 
-            if (this.projectName.isEmpty()) {
-                print("\n${ANSIColors.YELLOW_BACKGROUND_222}${ANSIColors.ANSI_BLACK} The project name can't be empty. ${ANSIColors.ANSI_RESET}\n")
+            if (this.moduleName.isEmpty()) {
+                print("\n${ANSIColors.YELLOW_BACKGROUND_222}${ANSIColors.ANSI_BLACK} The module name can't be empty. ${ANSIColors.ANSI_RESET}\n")
             }
 
-            if (File("${Paths.get("").toAbsolutePath()}/${this.projectName}").exists()) {
-                print("\n${ANSIColors.YELLOW_BACKGROUND_222}${ANSIColors.ANSI_BLACK} A project with the name ${this.projectName} already exist in the current location. ${ANSIColors.ANSI_RESET}\n")
+            if (File("${Paths.get("").toAbsolutePath()}/${this.moduleName}").exists()) {
+                print("\n${ANSIColors.YELLOW_BACKGROUND_222}${ANSIColors.ANSI_BLACK} A module with the name ${this.moduleName} already exist in the current location. ${ANSIColors.ANSI_RESET}\n")
 
-                this.projectName = ""
+                this.moduleName = ""
             }
-        } while (this.projectName.isEmpty())
+        } while (this.moduleName.isEmpty())
     }
 
     private fun askForVersion() {
@@ -81,12 +81,12 @@ class GradleOption : Wizard {
     private fun requestCreation() {
         val home = System.getProperty("user.home")
 
-        this::class.java.classLoader.getResourceAsStream("project-config.txt").use { inputStream ->
-            File("$home/.koupper/helpers/project-config.kts").outputStream().use {
+        this::class.java.classLoader.getResourceAsStream("module-config.txt").use { inputStream ->
+            File("$home/.koupper/helpers/module-config.kts").outputStream().use {
                 inputStream?.copyTo(it)
             }
         }
 
-        RunCommand().execute("$home/.koupper/helpers/project-config.kts", "projectName:${this.projectName},package:${this.`package`},version:${this.version}")
+        RunCommand().execute("$home/.koupper/helpers/module-config.kts", "projectName:${this.moduleName},package:${this.`package`},version:${this.version}")
     }
 }

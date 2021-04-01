@@ -1,7 +1,7 @@
 package com.koupper.cli.commands
 
 import com.koupper.cli.ANSIColors
-import com.koupper.cli.ANSIColors.ANSI_RED
+import com.koupper.cli.ANSIColors.ANSI_GREEN_155
 import com.koupper.cli.ANSIColors.ANSI_RESET
 import com.koupper.cli.ANSIColors.ANSI_WHITE
 import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
@@ -22,12 +22,15 @@ class RunCommand : Command() {
                 "koupper ${ANSIColors.ANSI_GREEN_155}$name${ANSI_RESET} [${ANSIColors.ANSI_GREEN_155}kotlinScriptName${ANSI_RESET}]"
         super.description = "run a kotlin script"
         super.arguments = emptyMap()
+        super.additionalInformation = """
+            visit for more info: https://koupper.com/cli/commands/run
+        """.trimIndent()
     }
 
     override fun execute(vararg args: String) {
         if (args.isNotEmpty() && args[0].isNotEmpty()) {
             if (".kts" !in args[0]) {
-                println("\n${ANSI_RED} The file should be an [kts] extension.\n")
+                println("\n${ANSI_YELLOW_229} The file must end [kts] extension or use ${ANSI_WHITE}koupper new module [${ANSI_GREEN_155}nameOfModule${ANSI_WHITE}]$ANSI_YELLOW_229.$ANSI_RESET\n")
 
                 exitProcess(7)
             }
@@ -77,6 +80,8 @@ class RunCommand : Command() {
         file.setExecutable(true)
         file.setReadable(true)
         file.setWritable(true)
+
+        exitProcess(0)
     }
 
     override fun name(): String {

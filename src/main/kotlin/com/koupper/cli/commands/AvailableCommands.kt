@@ -9,8 +9,7 @@ object AvailableCommands {
     const val DEFAULT = "default"
 
     fun commands(): Map<String, String> = mapOf(
-        NEW to "Creates a module or environment",
-        HELP to "Shows the commands description",
+        NEW to "Creates a module",
         RUN to "Run a kotlin script"
     )
 }

@@ -40,6 +40,7 @@ class HelpCommand : Command() {
 
         command.showDescription()
         command.showUsage()
+        command.showAdditionalInformation()
 
         if (command.arguments.isNotEmpty()) command.showArguments()
     }
