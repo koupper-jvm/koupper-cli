@@ -7,9 +7,13 @@ import com.koupper.cli.commands.AvailableCommands.RUN
 import java.io.File
 import java.io.IOException
 import java.net.URL
+import java.util.*
+import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 class CommandManager {
+    private val userPath = System.getProperty("user.home")
+
     fun process(arg: Array<String>) {
         this.checkForUpdates()
 
@@ -39,9 +43,27 @@ class CommandManager {
     }
 
     private fun checkForUpdates() {
-        try {
-            val userPath = System.getProperty("user.home")
+        val versionFile = File("$userPath/.koupper/helpers/.version")
 
+        if (versionFile.exists()) {
+            val lastRequested = versionFile.readLines().first()
+
+            val date = "\\D".toRegex().split(lastRequested).first {
+                it.isNotEmpty()
+            }
+
+            val timeElapsed = Date().time - Date(date.toLong()).time
+
+            val hoursElapsed = TimeUnit.MILLISECONDS.toHours(timeElapsed)
+
+            if (hoursElapsed.rem(2) == 0L) {
+                this.askForUpdating()
+            }
+        }
+    }
+
+    private fun askForUpdating() {
+        try {
             val process = Runtime.getRuntime()
                     .exec("$userPath/.koupper/helpers/octopusBootstrapper.sh UPDATING_CHECK")
 
@@ -61,7 +83,7 @@ class CommandManager {
                 print("updates are available, Would you like apply them now? [y/n] ")
 
                 when (readLine()) {
-                    "y" , "Y" -> {
+                    "y", "Y" -> {
                         val content = URL("https://lib-installer.s3.amazonaws.com/updateme.txt").readText()
 
                         val file = File("$userPath/.koupper/helpers/updateme.kts")
@@ -73,7 +95,11 @@ class CommandManager {
 
                         exitProcess(0)
                     }
-                    else -> return
+                    else -> {
+                        val version = File("$userPath/.koupper/helpers/.version")
+                        version.createNewFile()
+                        version.printWriter().use { out -> out.println("{\"last_request\": ${Date().time}}") }
+                    }
                 }
             }
         } catch (exception: IOException) {
