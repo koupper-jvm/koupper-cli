@@ -71,7 +71,7 @@ class CommandManager {
         command.execute(*args)
     }
 
-    fun askForUpdateFrom(baseDate: String) {
+    fun notifyAboutUpdate(baseDate: String) {
         print("updates are available, Would you like apply them now? [y/n] ")
 
         val updateInfo = File("$userPath/.koupper/helpers/.update_info")
@@ -89,11 +89,11 @@ class CommandManager {
                 updateInfo.printWriter().use { out -> out.println("{\"last_request\": ${Date().time}, \"ready_for_update\": false}") }
             }
             else -> {
-                updateInfo.printWriter().use { out -> out.println("{\"last_request\": $baseDate, \"ready_for_update\": true}") }
+                val lastRequest = Date(baseDate.toLong() - (3600 * 3) * 1000).time
+
+                updateInfo.printWriter().use { out -> out.println("{\"last_request\": $lastRequest, \"ready_for_update\": true}") }
             }
         }
-
-        exitProcess(0)
     }
 
     fun getCommandByName(input: String): Command {
@@ -133,7 +133,7 @@ fun main(args: Array<String>) = runBlocking {
         if (hoursElapsedSinceLastRequest >= 24) {
             if ("true|false".toRegex().find(updateInfo)!!.value.toBoolean()) {
                 if (hoursElapsedSinceLastRequest.rem(4) == 0L) {
-                    commandManager.askForUpdateFrom(date)
+                    commandManager.notifyAboutUpdate(date)
                 }
             } else {
                 launch {

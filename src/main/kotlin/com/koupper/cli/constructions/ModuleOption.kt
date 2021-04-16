@@ -38,7 +38,7 @@ class ModuleOption : Wizard {
                 print(
                         """
             
-                Module name: 
+                Module name -> 
             """.trimIndent()
                 )
 
@@ -59,17 +59,18 @@ class ModuleOption : Wizard {
         if (moduleType != null && moduleType.isNotEmpty()) {
             this.moduleType = moduleType
         } else {
-            println("\n${ANSI_YELLOW_229}Wath type of module do you need.$ANSI_RESET\n")
+            println("\n${ANSI_YELLOW_229}What build environment do you need?$ANSI_RESET\n")
+
             print(
                     """
-                        Select your option
+                        Choose one
                         $ANSI_YELLOW_229
-                        1.- Front
-                        2.- Back
-                        3.- DB
-                        4.- Docker $ANSI_RESET
+                        1.- front
+                        2.- back
+                        3.- dB
+                        4.- docker $ANSI_RESET
             
-                        option: 
+                        ->  
                     """.trimIndent()
             )
 
@@ -87,7 +88,7 @@ class ModuleOption : Wizard {
         val modulePath = File(moduleName)
 
         if (modulePath.exists()) {
-            print("\n${ANSI_YELLOW_229}The folder named $ANSI_GREEN_155${this.moduleName}$ANSI_RESET$ANSI_YELLOW_229 already exist. Try another name.$ANSI_RESET\n")
+            print("\n${ANSI_YELLOW_229}A folder named $ANSI_GREEN_155${this.moduleName}$ANSI_RESET$ANSI_YELLOW_229 already exist. Try using another name.$ANSI_RESET\n")
 
             exitProcess(0)
         }

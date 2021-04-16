@@ -20,7 +20,7 @@ class RunCommand : Command() {
         super.name = "run"
         super.usage =
                 "koupper ${ANSIColors.ANSI_GREEN_155}$name${ANSI_RESET} [${ANSIColors.ANSI_GREEN_155}kotlinScriptName${ANSI_RESET}]"
-        super.description = "run a kotlin script"
+        super.description = "Run a kotlin script"
         super.arguments = emptyMap()
         super.additionalInformation = """
             visit for more info: https://koupper.com/cli/commands/run
@@ -30,7 +30,7 @@ class RunCommand : Command() {
     override fun execute(vararg args: String) {
         if (args.isNotEmpty() && args[0].isNotEmpty()) {
             if (".kts" !in args[0]) {
-                println("\n${ANSI_YELLOW_229} The file must end [kts] extension or use ${ANSI_WHITE}koupper new module [${ANSI_GREEN_155}nameOfModule${ANSI_WHITE}]$ANSI_YELLOW_229.$ANSI_RESET\n")
+                println("\n${ANSI_YELLOW_229} The file must end with [.kts] extension or use ${ANSI_WHITE}koupper new module [${ANSI_GREEN_155}nameOfModule${ANSI_WHITE}]$ANSI_YELLOW_229.$ANSI_RESET\n")
 
                 exitProcess(7)
             }
@@ -55,7 +55,7 @@ class RunCommand : Command() {
         }
 
         if (initFile?.isEmpty()!!)
-            println("\n ${ANSI_WHITE}'init.kts' not exist. Create one typing: ${ANSI_YELLOW_229}koupper new file:init${ANSI_WHITE} or specify a script name.\n")
+            println("\n ${ANSI_WHITE}'init.kts' not found. Create one using: ${ANSI_YELLOW_229}koupper new file:init${ANSI_WHITE} or start creating a script.\n")
         else {
             val finalInitPath = Paths.get("").toAbsolutePath().toString() + "/init.kts"
 
@@ -63,13 +63,13 @@ class RunCommand : Command() {
         }
     }
 
-    private fun execute(fileName: String, params: String = "EMPTY_PARAMS") {
+    private fun execute(filePath: String, params: String = "EMPTY_PARAMS") {
         var finalFilePath = ""
 
-        finalFilePath += if (isSingleFileName(fileName)) {
-            Paths.get("").toAbsolutePath().toString() + "/$fileName "
+        finalFilePath += if (isSingleFileName(filePath)) {
+            Paths.get("").toAbsolutePath().toString() + "/$filePath "
         } else {
-            fileName
+            filePath
         }.trim()
 
         val userPath = System.getProperty("user.home")

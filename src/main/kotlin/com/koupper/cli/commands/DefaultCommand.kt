@@ -15,7 +15,7 @@ class DefaultCommand : Command() {
     init {
         super.name = "koupper"
         super.usage = "$name [${ANSI_GREEN_155}command$ANSI_RESET]"
-        super.description = "koupper cli ${ANSI_GREEN_155}3.0.0$ANSI_RESET"
+        super.description = "koupper cli ${ANSI_GREEN_155}3.5.0$ANSI_RESET"
         super.arguments = commands()
         super.additionalInformation = """
    note: You should use the ${ANSI_WHITE}koupper ${ANSI_GREEN_155}help $ANSI_WHITE[${ANSI_GREEN_155}command$ANSI_WHITE]$ANSI_RESET ${ANSI_YELLOW_229}option to

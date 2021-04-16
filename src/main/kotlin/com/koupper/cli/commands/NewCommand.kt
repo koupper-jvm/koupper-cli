@@ -17,7 +17,7 @@ class NewCommand : Command() {
     init {
         super.name = NEW
         super.usage = "koupper ${ANSI_GREEN_155}$name$ANSI_RESET ${ANSI_GREEN_155}module${ANSI_RESET}"
-        super.description = "create a module"
+        super.description = "Creates a module"
         super.arguments = emptyMap()
         super.additionalInformation = """
    visit for more info: https://koupper.com/cli/commands/new
@@ -62,7 +62,7 @@ class NewCommand : Command() {
             if (".kts" in args[0].trim()) {
                 this::class.java.classLoader.getResourceAsStream("script.txt").toFile("$currentDirectory/" + args[0])
             } else {
-                println("\n${ANSI_YELLOW_229} The file must end [kts] extension or use ${ANSIColors.ANSI_WHITE}koupper new module [${ANSI_GREEN_155}nameOfModule${ANSIColors.ANSI_WHITE}]$ANSI_YELLOW_229.$ANSI_RESET\n")
+                println("\n${ANSI_YELLOW_229} The file must end with [kts] extension or use ${ANSIColors.ANSI_WHITE}koupper new module [${ANSI_GREEN_155}nameOfModule${ANSIColors.ANSI_WHITE}]$ANSI_YELLOW_229.$ANSI_RESET\n")
 
                 return
             }
@@ -86,11 +86,11 @@ class NewCommand : Command() {
     }
 
     private fun askForCreation() {
-        print("${ANSI_YELLOW_229}You can create a module typing a name or a script appending the .kts extension to name.\n")
+        this.showAdditionalInformation()
         print(
                 """
 
-            Select your option
+            Choose one
             $ANSI_YELLOW_229
             1.- Module
             2.- Script (default)$ANSI_RESET
