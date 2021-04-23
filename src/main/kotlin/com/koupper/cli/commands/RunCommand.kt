@@ -1,11 +1,10 @@
 package com.koupper.cli.commands
 
-import com.koupper.cli.ANSIColors
-import com.koupper.cli.ANSIColors.ANSI_RED
+import com.koupper.cli.ANSIColors.ANSI_GREEN_155
 import com.koupper.cli.ANSIColors.ANSI_RESET
 import com.koupper.cli.ANSIColors.ANSI_WHITE
 import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
-import java.io.IOException
+import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.stream.Collectors
@@ -19,15 +18,18 @@ class RunCommand : Command() {
     init {
         super.name = "run"
         super.usage =
-                "koupper ${ANSIColors.ANSI_GREEN_155}$name${ANSI_RESET} [${ANSIColors.ANSI_GREEN_155}kotlinScriptName${ANSI_RESET}]"
-        super.description = "run a kotlin script"
+                "koupper ${ANSI_GREEN_155}$name${ANSI_RESET} [${ANSI_GREEN_155}kotlinScriptName${ANSI_RESET}]"
+        super.description = "Run a kotlin script"
         super.arguments = emptyMap()
+        super.additionalInformation = """
+   visit for more info: https://koupper.com/cli/commands/run
+        """
     }
 
     override fun execute(vararg args: String) {
         if (args.isNotEmpty() && args[0].isNotEmpty()) {
             if (".kts" !in args[0]) {
-                println("\n${ANSI_RED} The file should be an [kts] extension.\n")
+                println("\n${ANSI_YELLOW_229} The file must end with [.kts] extension or use ${ANSI_WHITE}koupper new module [${ANSI_GREEN_155}nameOfModule${ANSI_WHITE}]$ANSI_YELLOW_229.$ANSI_RESET\n")
 
                 exitProcess(7)
             }
@@ -52,7 +54,7 @@ class RunCommand : Command() {
         }
 
         if (initFile?.isEmpty()!!)
-            println("\n ${ANSI_YELLOW_229}'init.kts' not exist. Create one typing: ${ANSI_WHITE}koupper new file:init${ANSI_WHITE}\n")
+            println("\n ${ANSI_WHITE}'init.kts' not found. Create one using: ${ANSI_YELLOW_229}koupper new file:init${ANSI_WHITE} or start creating a script.\n")
         else {
             val finalInitPath = Paths.get("").toAbsolutePath().toString() + "/init.kts"
 
@@ -60,39 +62,25 @@ class RunCommand : Command() {
         }
     }
 
-    private fun execute(fileName: String, params: String = "EMPTY_PARAMS") {
+    private fun execute(filePath: String, params: String = "EMPTY_PARAMS") {
         var finalFilePath = ""
 
-        finalFilePath += if (isSingleFileName(fileName)) {
-            Paths.get("").toAbsolutePath().toString() + "/$fileName "
+        finalFilePath += if (isSingleFileName(filePath)) {
+            Paths.get("").toAbsolutePath().toString() + "/$filePath "
         } else {
-            fileName
+            filePath
         }.trim()
 
-        try {
-            val userPath = System.getProperty("user.home")
+        val userPath = System.getProperty("user.home")
 
-            val process = Runtime.getRuntime()
-                    .exec("$userPath/.koupper/helpers/octopusBootstrapper.sh $finalFilePath $params")
+        val file = File("$userPath/.koupper/helpers/octopus-parameters.txt")
+        file.writeText("$finalFilePath $params")
+        file.createNewFile()
+        file.setExecutable(true)
+        file.setReadable(true)
+        file.setWritable(true)
 
-            process.waitFor()
-
-            val errors = process.errorStream.bufferedReader().readText()
-
-            if (errors.isNotEmpty()) {
-                print("$ANSI_RED$errors$ANSI_RESET")
-
-                exitProcess(7)
-            }
-
-            val output = process.inputStream.bufferedReader().readText()
-
-            print(output)
-        } catch (exception: IOException) {
-            println()
-            println(ANSI_RED + exception.printStackTrace())
-            println()
-        }
+        exitProcess(0)
     }
 
     override fun name(): String {

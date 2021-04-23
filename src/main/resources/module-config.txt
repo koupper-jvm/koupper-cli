@@ -1,0 +1,8 @@
+import com.koupper.octopus.process.Process
+
+val init: (Process, Map<String, Any>) -> Process = { module, args ->
+    module.register(args["moduleName"] as String, mapOf("moduleType" to args["moduleType"] as String))
+    module.run()
+    module
+}
+

@@ -1,7 +1,9 @@
 package com.koupper.cli.commands
 
-import com.koupper.cli.ANSIColors
+import com.koupper.cli.ANSIColors.ANSI_GREEN_155
+import com.koupper.cli.ANSIColors.ANSI_RESET
 import com.koupper.cli.ANSIColors.ANSI_WHITE
+import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
 import com.koupper.cli.commands.AvailableCommands.BUILD
 import com.koupper.cli.commands.AvailableCommands.HELP
 import com.koupper.cli.commands.AvailableCommands.commands
@@ -14,7 +16,7 @@ class BuildCommand : Command() {
 
     init {
         super.name = BUILD
-        super.usage = "koupper ${ANSIColors.ANSI_GREEN_155}$name${ANSIColors.ANSI_RESET} [${ANSIColors.ANSI_GREEN_155}command${ANSIColors.ANSI_RESET}]"
+        super.usage = "koupper ${ANSI_GREEN_155}$name${ANSI_RESET} [${ANSI_GREEN_155}command${ANSI_RESET}]"
         super.description = commands()[super.name].toString()
         super.arguments = emptyMap()
     }
@@ -24,7 +26,7 @@ class BuildCommand : Command() {
             val currentDirectory = System.getProperty("user.dir")
 
             if (!File("$currentDirectory/init.kts").exists()) {
-                println("\n ${ANSIColors.ANSI_YELLOW_229}'init.kts' not exist. Create one typing: ${ANSI_WHITE}koupper new file:init${ANSIColors.ANSI_RESET}\n")
+                println("\n ${ANSI_WHITE}'init.kts' not found. Create one using: ${ANSI_YELLOW_229}koupper new file:init${ANSI_RESET}\n")
 
                 return
             }
@@ -33,15 +35,13 @@ class BuildCommand : Command() {
 
             return
         }
-
-
     }
 
     override fun showArguments() {
-        println(" ${ANSIColors.ANSI_YELLOW_229}• Arguments:${ANSIColors.ANSI_RESET}")
+        println(" ${ANSI_YELLOW_229}• Arguments:${ANSI_RESET}")
 
         this.arguments.forEach { (commandName, _) ->
-            println("   ${ANSIColors.ANSI_GREEN_155}$commandName${ANSIColors.ANSI_RESET}")
+            println("   ${ANSI_GREEN_155}$commandName${ANSI_RESET}")
         }
 
         println()

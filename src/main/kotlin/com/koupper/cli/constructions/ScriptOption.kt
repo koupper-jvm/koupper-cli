@@ -10,7 +10,7 @@ import java.io.File
 import java.io.InputStream
 
 class ScriptOption : Wizard {
-    override fun init() {
+    override fun init(args: Map<String, String>) {
         var fileName: String?
 
         do {
