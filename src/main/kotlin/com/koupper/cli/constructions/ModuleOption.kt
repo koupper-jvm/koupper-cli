@@ -11,7 +11,6 @@ import kotlin.system.exitProcess
 class ModuleOption : Wizard {
     private lateinit var moduleName: String
     private var moduleType: String = "FRONT"
-    private lateinit var version: String
     private lateinit var args: Map<String, String>
 
     override fun init(args: Map<String, String>) {
@@ -59,18 +58,17 @@ class ModuleOption : Wizard {
         if (moduleType != null && moduleType.isNotEmpty()) {
             this.moduleType = moduleType
         } else {
-            println("\n${ANSI_YELLOW_229}What build environment do you need?$ANSI_RESET\n")
-
             print(
                     """
-                        Choose one
+                        
+                        ${ANSI_YELLOW_229}What build environment do you need?
                         $ANSI_YELLOW_229
                         1.- front
                         2.- back
-                        3.- dB
+                        3.- db
                         4.- docker $ANSI_RESET
             
-                        ->  
+                        -> 
                     """.trimIndent()
             )
 
@@ -81,6 +79,8 @@ class ModuleOption : Wizard {
                 "4" -> "VIRTUALIZATION"
                 else -> "FRONT"
             }
+
+            println()
         }
     }
 

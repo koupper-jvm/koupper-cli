@@ -1,6 +1,5 @@
 package com.koupper.cli.commands
 
-import com.koupper.cli.ANSIColors
 import com.koupper.cli.ANSIColors.ANSI_GREEN_155
 import com.koupper.cli.ANSIColors.ANSI_RESET
 import com.koupper.cli.ANSIColors.ANSI_WHITE
@@ -19,12 +18,12 @@ class RunCommand : Command() {
     init {
         super.name = "run"
         super.usage =
-                "koupper ${ANSIColors.ANSI_GREEN_155}$name${ANSI_RESET} [${ANSIColors.ANSI_GREEN_155}kotlinScriptName${ANSI_RESET}]"
+                "koupper ${ANSI_GREEN_155}$name${ANSI_RESET} [${ANSI_GREEN_155}kotlinScriptName${ANSI_RESET}]"
         super.description = "Run a kotlin script"
         super.arguments = emptyMap()
         super.additionalInformation = """
-            visit for more info: https://koupper.com/cli/commands/run
-        """.trimIndent()
+   visit for more info: https://koupper.com/cli/commands/run
+        """
     }
 
     override fun execute(vararg args: String) {

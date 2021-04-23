@@ -87,28 +87,32 @@ class NewCommand : Command() {
 
     private fun askForCreation() {
         this.showAdditionalInformation()
+
         print(
                 """
-
             Choose one
             $ANSI_YELLOW_229
             1.- Module
             2.- Script (default)$ANSI_RESET
             
-            option: 
+            -> 
         """.trimIndent()
         )
 
         val option = readLine()
 
         when {
-            option!!.isEmpty() -> ScriptOption().init()
+            option!!.isEmpty() -> {
+                print("\n$YELLOW_BACKGROUND_222$ANSI_BLACK Using default option [1-Script]. $ANSI_RESET\n")
+
+                ScriptOption().init()
+            }
             option == "1" -> ModuleOption().init()
             option == "2" -> ScriptOption().init()
             else -> {
                 println("\n$YELLOW_BACKGROUND_222$ANSI_BLACK Option $option is not valid. Using default [module] option. $ANSI_RESET\n")
 
-                KotlinOption().init()
+                ModuleOption().init()
             }
         }
     }
