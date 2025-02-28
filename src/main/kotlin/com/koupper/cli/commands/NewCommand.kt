@@ -17,7 +17,7 @@ class NewCommand : Command() {
     init {
         super.name = NEW
         super.usage = "koupper ${ANSI_GREEN_155}$name$ANSI_RESET ${ANSI_GREEN_155}module${ANSI_RESET}"
-        super.description = "Creates a module"
+        super.description = "Creates a module or script"
         super.arguments = emptyMap()
         super.additionalInformation = """
    visit for more info: https://koupper.com/cli/commands/new
@@ -28,56 +28,48 @@ class NewCommand : Command() {
         return NEW
     }
 
-    override fun execute(vararg args: String) {
-        if (args.isNotEmpty()) {
-            val currentDirectory = System.getProperty("user.dir")
-            var moduleName = ""
-            var moduleType = ""
+    override fun execute(vararg args: String): String {
+        return when {
+            args.isEmpty() -> {
+                this.askForCreation()
+                ""
+            }
 
-            if (args[0].trim() == "module") {
-                if (args.size > 1 && args[1].isNotEmpty()) {
-                    moduleName = args[1].trim()
-                }
-
-                if (args.size > 2 && args[2].isNotEmpty()) {
-                    moduleType = args[2].trim()
-                }
+            args[0].trim() == "module" -> {
+                val moduleName = if (args.size > 1 && args[1].isNotEmpty()) args[1].trim() else ""
+                val moduleType = if (args.size > 2 && args[2].isNotEmpty()) args[2].trim() else ""
 
                 ModuleOption().init(
-                        mapOf(
-                                "moduleName" to moduleName,
-                                "moduleType" to moduleType
-                        )
+                    mapOf(
+                        "moduleName" to moduleName,
+                        "moduleType" to moduleType
+                    )
                 )
-
-                return
+                ""
             }
 
-            if ("file:init" in args[0]) {
-                this::class.java.classLoader.getResourceAsStream("init.txt").toFile("$currentDirectory/init.kts")
-
-                return
+            "file:init" in args[0] -> {
+                val currentDirectory = System.getProperty("user.dir")
+                this::class.java.classLoader.getResourceAsStream("init.txt")?.toFile("$currentDirectory/init.kts")
+                ""
             }
 
-            if (".kts" in args[0].trim()) {
-                this::class.java.classLoader.getResourceAsStream("script.txt").toFile("$currentDirectory/" + args[0])
-            } else {
+            ".kts" in args[0].trim() -> {
+                val currentDirectory = System.getProperty("user.dir")
+                this::class.java.classLoader.getResourceAsStream("script.txt")?.toFile("$currentDirectory/" + args[0])
+                ""
+            }
+
+            else -> {
                 println("\n${ANSI_YELLOW_229} The file must end with [kts] extension or use ${ANSIColors.ANSI_WHITE}koupper new module [${ANSI_GREEN_155}nameOfModule${ANSIColors.ANSI_WHITE}]$ANSI_YELLOW_229.$ANSI_RESET\n")
-
-                return
+                ""
             }
-        } else {
-            this.askForCreation()
-
-            return
-        }
-
-        val env = File(".env")
-
-        if (!env.exists()) {
-            println("\n ${ANSI_YELLOW_229}An file .env was created to keep the scripts configurations$ANSI_RESET\n")
-
-            File(".env").createNewFile()
+        }.also {
+            val env = File(".env")
+            if (!env.exists()) {
+                println("\n ${ANSI_YELLOW_229}An file .env was created to keep the scripts configurations$ANSI_RESET\n")
+                env.createNewFile()
+            }
         }
     }
 

@@ -5,16 +5,21 @@ import com.koupper.cli.commands.*
 import com.koupper.cli.commands.AvailableCommands.HELP
 import com.koupper.cli.commands.AvailableCommands.NEW
 import com.koupper.cli.commands.AvailableCommands.RUN
+import javafx.application.Application.launch
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import java.io.File
 import java.io.IOException
+import java.net.ServerSocket
 import java.net.URL
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 private val userPath = System.getProperty("user.home")
+private val commandFile = File("$userPath/.koupper/helpers/koupper-commands.txt")
 
 private fun checkForUpdatesFrom(baseDate: String) {
     try {
@@ -45,30 +50,30 @@ private fun checkForUpdatesFrom(baseDate: String) {
 
 
 class CommandManager {
-    fun process(arg: Array<String>) {
-        if (arg.isEmpty()) {
-            DefaultCommand().execute()
+    fun process(arg: Array<String>): String {
+        return when {
+            arg.isEmpty() -> {
+                DefaultCommand().execute()
+                "Default command executed."
+            }
 
-            return
+            isFlagVersion(arg[0]) -> {
+                DefaultCommand().showDescription()
+                "Version description shown."
+            }
+
+            getCommandByName(arg[0]) is UndefinedCommand -> {
+                val undefinedCommand = getCommandByName(arg[0]) as UndefinedCommand
+                undefinedCommand.execute(arg[0])
+                "Undefined command executed: ${arg[0]}"
+            }
+
+            else -> {
+                val command = getCommandByName(arg[0])
+                val args = this.getArgsFrom(arg)
+                command.execute(*args)
+            }
         }
-
-        if (this.isFlagVersion(arg[0])) {
-            DefaultCommand().showDescription()
-
-            return
-        }
-
-        val command = getCommandByName(arg[0])
-
-        if (command is UndefinedCommand) {
-            command.execute(arg[0])
-
-            return
-        }
-
-        val args = this.getArgsFrom(arg)
-
-        command.execute(*args)
     }
 
     fun notifyAboutUpdate(baseDate: String) {
@@ -115,33 +120,88 @@ class CommandManager {
 }
 
 fun main(args: Array<String>) = runBlocking {
-    val commandManager = CommandManager()
+    val scope = CoroutineScope(Dispatchers.Default)
 
-    val versionFile = File("$userPath/.koupper/helpers/.update_info")
+    scope.launch {
+        val commandManager = CommandManager()
+        val versionFile = File("$userPath/.koupper/helpers/.update_info")
 
-    if (versionFile.exists()) {
-        val updateInfo = versionFile.readLines().first()
+        if (versionFile.exists()) {
+            val updateInfo = versionFile.readLines().firstOrNull() ?: ""
 
-        val date = "\\D".toRegex().split(updateInfo).first {
-            it.isNotEmpty()
+            val date = "\\D".toRegex().split(updateInfo).firstOrNull { it.isNotEmpty() } ?: "0"
+
+            val timeElapsedSinceLastRequest = Date().time - Date(date.toLong()).time
+            val hoursElapsedSinceLastRequest = TimeUnit.MILLISECONDS.toHours(timeElapsedSinceLastRequest)
+
+            if (hoursElapsedSinceLastRequest >= 24) {
+                if ("true|false".toRegex().find(updateInfo)?.value?.toBoolean() == true) {
+                    if (hoursElapsedSinceLastRequest.rem(4) == 0L) {
+                        commandManager.notifyAboutUpdate(date)
+                    }
+                } else {
+                    launch { checkForUpdatesFrom(date) }
+                }
+            }
         }
 
-        val timeElapsedSinceLastRequest = Date().time - Date(date.toLong()).time
+        startSocketServer(commandManager, this)
+    }
 
-        val hoursElapsedSinceLastRequest = TimeUnit.MILLISECONDS.toHours(timeElapsedSinceLastRequest)
+    while (true) {
+        delay(1000)
+    }
+}
 
-        if (hoursElapsedSinceLastRequest >= 24) {
-            if ("true|false".toRegex().find(updateInfo)!!.value.toBoolean()) {
-                if (hoursElapsedSinceLastRequest.rem(4) == 0L) {
-                    commandManager.notifyAboutUpdate(date)
-                }
-            } else {
-                launch {
-                    checkForUpdatesFrom(date)
+fun startSocketServer(commandManager: CommandManager, scope: CoroutineScope) {
+    val serverSocket = ServerSocket(9999)
+    println("🔄 Servidor de sockets iniciado en el puerto 9999...")
+
+    while (true) {
+        val clientSocket = serverSocket.accept()
+        println("🔗 Nueva conexión a koupper-cli: ${clientSocket.inetAddress.hostAddress}")
+
+        scope.launch {
+            clientSocket.use { socket ->
+                try {
+                    val reader = socket.getInputStream().bufferedReader()
+                    val writer = socket.getOutputStream().bufferedWriter()
+
+                    val command = reader.readLine()?.trim()
+                    if (command.isNullOrBlank()) {
+                        return@launch
+                    }
+
+                    println("📥 Comando recibido en koupper-cli: $command")
+
+                    val response = commandManager.process(command.split(" ").toTypedArray())
+
+                    writer.write(response)
+                    writer.flush()
+                } catch (e: Exception) {
+                    println("⚠️ Error en la conexión: ${e.message}")
                 }
             }
         }
     }
+}
 
-    commandManager.process(args)
+suspend fun listenForExternalCommands(commandManager: CommandManager) {
+    var lastModified = commandFile.lastModified()
+
+    while (true) {
+        try {
+            if (commandFile.exists() && commandFile.length() > 0 && commandFile.lastModified() > lastModified) {
+                val commandText = commandFile.readText().trim()
+                if (commandText.isNotEmpty()) {
+                    commandManager.process(commandText.split(" ").toTypedArray())
+                    commandFile.writeText("")
+                    lastModified = commandFile.lastModified()
+                }
+            }
+            delay(2000)
+        } catch (e: Exception) {
+            println("⚠️ Error loading commands file: ${e.message}")
+        }
+    }
 }

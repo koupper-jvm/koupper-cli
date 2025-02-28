@@ -23,7 +23,7 @@ class DefaultCommand : Command() {
         """
     }
 
-    override fun execute(vararg args: String) {
+    override fun execute(vararg args: String): String {
         super.showDescription()
 
         super.showUsage()
@@ -31,5 +31,7 @@ class DefaultCommand : Command() {
         super.showAdditionalInformation()
 
         super.showArguments()
+
+        return ""
     }
 }

@@ -10,7 +10,8 @@ class UndefinedCommand : Command() {
         return UNDEFINED
     }
 
-    override fun execute(vararg args: String) {
+    override fun execute(vararg args: String): String {
         println("\n$RED_BACKGROUND_203$ANSI_WHITE The command '${args[0]}' is undefined. $ANSI_RESET \n")
+        return ""
     }
 }

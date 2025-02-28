@@ -19,34 +19,33 @@ class HelpCommand : Command() {
         super.arguments = commands()
     }
 
-    override fun execute(vararg args: String) {
-        if (args.isEmpty()) {
-            super.showDescription()
+    override fun execute(vararg args: String): String {
+        return when {
+            args.isEmpty() -> {
+                super.showDescription()
+                super.showUsage()
+                this.showArguments()
+                ""
+            }
 
-            super.showUsage()
-
-            this.showArguments()
-
-            return
+            else -> {
+                val command = CommandManager().getCommandByName(args[0])
+                if (command is UndefinedCommand) {
+                    command.execute(args[0])
+                    ""
+                } else {
+                    command.showDescription()
+                    command.showUsage()
+                    command.showAdditionalInformation()
+                    if (command.arguments.isNotEmpty()) command.showArguments()
+                    ""
+                }
+            }
         }
-
-        val command = CommandManager().getCommandByName(args[0])
-
-        if (command is UndefinedCommand) {
-            command.execute(args[0])
-
-            return
-        }
-
-        command.showDescription()
-        command.showUsage()
-        command.showAdditionalInformation()
-
-        if (command.arguments.isNotEmpty()) command.showArguments()
     }
 
     override fun showArguments() {
-        println(" ${ANSIColors.ANSI_YELLOW_229}• Arguments:$ANSI_RESET")
+        println("\n ${ANSIColors.ANSI_YELLOW_229}* Arguments:$ANSI_RESET")
 
         this.arguments.forEach { (commandName, _) ->
             println("   $ANSI_GREEN_155$commandName$ANSI_RESET")

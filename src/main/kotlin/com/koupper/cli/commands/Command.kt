@@ -11,7 +11,7 @@ abstract class Command {
     lateinit var arguments: Map<String, String>
     lateinit var additionalInformation: String
 
-    abstract fun execute(vararg args: String)
+    abstract fun execute(vararg args: String): String
 
     abstract fun name(): String
 

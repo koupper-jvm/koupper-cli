@@ -21,19 +21,20 @@ class BuildCommand : Command() {
         super.arguments = emptyMap()
     }
 
-    override fun execute(vararg args: String) {
-        if (args.isEmpty()) {
-            val currentDirectory = System.getProperty("user.dir")
-
-            if (!File("$currentDirectory/init.kts").exists()) {
-                println("\n ${ANSI_WHITE}'init.kts' not found. Create one using: ${ANSI_YELLOW_229}koupper new file:init${ANSI_RESET}\n")
-
-                return
+    override fun execute(vararg args: String): String {
+        return when {
+            args.isEmpty() -> {
+                val currentDirectory = System.getProperty("user.dir")
+                if (!File("$currentDirectory/init.kts").exists()) {
+                    println("\n ${ANSI_WHITE}'init.kts' not found. Create one using: ${ANSI_YELLOW_229}koupper new file:init${ANSI_RESET}\n")
+                    ""
+                } else {
+                    RunCommand().execute("$currentDirectory/init.kts")
+                    ""
+                }
             }
 
-            RunCommand().execute("$currentDirectory/init.kts")
-
-            return
+            else -> ""
         }
     }
 

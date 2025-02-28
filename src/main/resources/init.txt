@@ -1,7 +1,17 @@
-import com.koupper.octopus.managers.ScriptManager
+import com.koupper.octopus.process.ScriptProcessor
 
-val init: (ScriptManager) -> ScriptManager = {
-    it.runScript("yourScript.kts") // the params are optional as a map in second place to 'runScript' function.
-
-    //it.runScript("yourScript.kts", mapOf("key" to value))
+val setup: (ScriptProcessor) -> Unit = { processor ->
+    processor.register(
+        "process-project-name",
+        mutableMapOf(
+            "server.port" to "8080",
+            "server.rootUrl" to "api/v1"
+        ),
+        "LOCAL_AWS_DEPLOYMENT",
+        "1.0.0",
+        "dev.example",
+        mapOf(
+            "idForTheScript" to "relative/path/to/script.kts",
+        )
+    ).run()
 }
