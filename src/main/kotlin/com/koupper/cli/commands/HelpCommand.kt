@@ -14,43 +14,54 @@ class HelpCommand : Command() {
 
     init {
         super.name = HELP
-        super.usage = "koupper ${ANSI_GREEN_155}$name$ANSI_RESET [${ANSI_GREEN_155}command$ANSI_RESET]"
-        super.description = "Shows help for commands"
+        super.usage = "\n   koupper ${ANSI_GREEN_155}$name$ANSI_RESET [${ANSI_GREEN_155}command$ANSI_RESET]\n"
+        super.description = "\n   Shows help for commands\n"
         super.arguments = commands()
     }
 
     override fun execute(vararg args: String): String {
         return when {
-            args.isEmpty() -> {
-                super.showDescription()
-                super.showUsage()
-                this.showArguments()
-                ""
+            args.size == 1 -> {
+                val description = super.showDescription()
+                val usage = super.showUsage()
+                val arguments = this.showArguments()
+                "$description$usage$arguments"
             }
 
             else -> {
-                val command = CommandManager().getCommandByName(args[0])
-                if (command is UndefinedCommand) {
-                    command.execute(args[0])
-                    ""
-                } else {
-                    command.showDescription()
-                    command.showUsage()
-                    command.showAdditionalInformation()
-                    if (command.arguments.isNotEmpty()) command.showArguments()
-                    ""
+                when (val command = CommandManager().getCommandByName(args[1])) {
+                    is HelpCommand -> {
+                        val description = super.showDescription()
+                        val usage = super.showUsage()
+                        val arguments = this.showArguments()
+                        "$description$usage$arguments"
+                    }
+
+                    is UndefinedCommand -> {
+                        command.execute(args[1])
+                    }
+
+                    else -> {
+                        val description = command.showDescription()
+                        val usage = command.showUsage()
+                        val additionalInformation = command.showAdditionalInformation()
+                        val arguments = if (command.arguments.isNotEmpty()) command.showArguments() else ""
+                        "$description$usage$additionalInformation$arguments"
+                    }
                 }
             }
         }
     }
 
-    override fun showArguments() {
-        println("\n ${ANSIColors.ANSI_YELLOW_229}* Arguments:$ANSI_RESET")
+    override fun showArguments(): String {
+        val argHeader = "\n ${ANSIColors.ANSI_YELLOW_229}* Arguments:$ANSI_RESET \n"
+
+        var finalArgInfo = ""
 
         this.arguments.forEach { (commandName, _) ->
-            println("   $ANSI_GREEN_155$commandName$ANSI_RESET")
+            finalArgInfo += "   $ANSI_GREEN_155$commandName$ANSI_RESET \n"
         }
 
-        println()
+        return "$argHeader$finalArgInfo"
     }
 }

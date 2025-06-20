@@ -38,13 +38,15 @@ class BuildCommand : Command() {
         }
     }
 
-    override fun showArguments() {
-        println(" ${ANSI_YELLOW_229}• Arguments:${ANSI_RESET}")
+    override fun showArguments(): String {
+        val argHeader = " ${ANSI_YELLOW_229}• Arguments:${ANSI_RESET} \n"
+
+        var finalArgInfo = ""
 
         this.arguments.forEach { (commandName, _) ->
-            println("   ${ANSI_GREEN_155}$commandName${ANSI_RESET}")
+            finalArgInfo += "   ${ANSI_GREEN_155}$commandName${ANSI_RESET} \n"
         }
 
-        println()
+        return "$argHeader$finalArgInfo"
     }
 }

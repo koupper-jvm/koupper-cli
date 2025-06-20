@@ -1,5 +1,7 @@
 import com.koupper.container.app
+import com.koupper.octopus.annotations.Export
 
+@Export
 val myScript: () -> String = {
     "Hello world"
 }

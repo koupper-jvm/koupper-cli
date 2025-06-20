@@ -16,8 +16,8 @@ import java.io.InputStream
 class NewCommand : Command() {
     init {
         super.name = NEW
-        super.usage = "koupper ${ANSI_GREEN_155}$name$ANSI_RESET ${ANSI_GREEN_155}module${ANSI_RESET}"
-        super.description = "Creates a module or script"
+        super.usage = "\n   koupper ${ANSI_GREEN_155}$name$ANSI_RESET ${ANSI_GREEN_155}module name=\"auth-server\",version=\"1.0.0\",package=\"tdn.auth\"${ANSI_RESET}\n\n   koupper ${ANSI_GREEN_155}$name$ANSI_RESET ${ANSI_GREEN_155}script-name.kts${ANSI_RESET}\n"
+        super.description = "\n   Creates a module or script\n"
         super.arguments = emptyMap()
         super.additionalInformation = """
    visit for more info: https://koupper.com/cli/commands/new
@@ -29,83 +29,73 @@ class NewCommand : Command() {
     }
 
     override fun execute(vararg args: String): String {
-        return when {
-            args.isEmpty() -> {
-                this.askForCreation()
+        var result = when {
+            args.size < 2 -> {
+                this.showNewInfo()
+            }
+
+            args[1].trim() == "module" -> {
                 ""
             }
 
-            args[0].trim() == "module" -> {
-                val moduleName = if (args.size > 1 && args[1].isNotEmpty()) args[1].trim() else ""
-                val moduleType = if (args.size > 2 && args[2].isNotEmpty()) args[2].trim() else ""
+            "file:init" in args[1] -> {
+                val currentDirectory = args[0]
+                val finalScript = currentDirectory + File.separator + "init.kts"
 
-                ModuleOption().init(
-                    mapOf(
-                        "moduleName" to moduleName,
-                        "moduleType" to moduleType
-                    )
-                )
-                ""
+                if (File(finalScript).exists()) {
+                    return "\n${ANSI_YELLOW_229} The script ${File(finalScript).name} already exist.${ANSI_RESET}\n"
+                }
+
+                this::class.java.classLoader.getResourceAsStream("init.txt")?.toFile(finalScript)
+                "init.kts file created."
             }
 
-            "file:init" in args[0] -> {
-                val currentDirectory = System.getProperty("user.dir")
-                this::class.java.classLoader.getResourceAsStream("init.txt")?.toFile("$currentDirectory/init.kts")
-                ""
-            }
+            ".kts" in args[1].trim() || ".kt" in args[1].trim() -> {
+                val currentDirectory = args[0]
+                val finalScript = currentDirectory + File.separator + args[1]
 
-            ".kts" in args[0].trim() -> {
-                val currentDirectory = System.getProperty("user.dir")
-                this::class.java.classLoader.getResourceAsStream("script.txt")?.toFile("$currentDirectory/" + args[0])
-                ""
+                if (File(finalScript).exists()) {
+                    return "\n${ANSI_YELLOW_229} The script ${File(finalScript).name} already exist.${ANSI_RESET}\n"
+                }
+
+                this::class.java.classLoader.getResourceAsStream("script.txt")?.toFile(finalScript)
+                "${args[1]} file created."
             }
 
             else -> {
-                println("\n${ANSI_YELLOW_229} The file must end with [kts] extension or use ${ANSIColors.ANSI_WHITE}koupper new module [${ANSI_GREEN_155}nameOfModule${ANSIColors.ANSI_WHITE}]$ANSI_YELLOW_229.$ANSI_RESET\n")
-                ""
-            }
-        }.also {
-            val env = File(".env")
-            if (!env.exists()) {
-                println("\n ${ANSI_YELLOW_229}An file .env was created to keep the scripts configurations$ANSI_RESET\n")
-                env.createNewFile()
+                "\n${ANSI_YELLOW_229} The file must end with [.kts] extension or use: ${ANSIColors.ANSI_WHITE}koupper new module [${ANSI_GREEN_155}nameOfModule${ANSIColors.ANSI_WHITE}]$ANSI_YELLOW_229.$ANSI_RESET\n"
             }
         }
+
+        val env = File(".env")
+
+        if (!env.exists()) {
+            env.createNewFile()
+
+            result += "\nrm ${ANSI_YELLOW_229}An file .env was created to keep the scripts configurations$ANSI_RESET\n"
+        }
+
+        return result
     }
 
     private fun InputStream.toFile(path: String) {
         File(path).outputStream().use { this.copyTo(it) }
     }
 
-    private fun askForCreation() {
-        this.showAdditionalInformation()
+    private fun showNewInfo(): String {
+        val additionalInfo = this.showAdditionalInformation()
 
-        print(
-                """
-            Choose one
-            $ANSI_YELLOW_229
-            1.- Module
-            2.- Script (default)$ANSI_RESET
+        val newInfo = """
             
-            -> 
+               You can create:
+            $ANSI_YELLOW_229
+               1.- Module: A gradle project containing scripts, resources, and configurations to manage your development.  
+               2.- Script: A simple script to do something.
+            $ANSI_RESET
+               Use the command$ANSI_YELLOW_229 koupper help new$ANSI_RESET for more information.
+               
         """.trimIndent()
-        )
 
-        val option = readLine()
-
-        when {
-            option!!.isEmpty() -> {
-                print("\n$YELLOW_BACKGROUND_222$ANSI_BLACK Using default option [1-Script]. $ANSI_RESET\n")
-
-                ScriptOption().init()
-            }
-            option == "1" -> ModuleOption().init()
-            option == "2" -> ScriptOption().init()
-            else -> {
-                println("\n$YELLOW_BACKGROUND_222$ANSI_BLACK Option $option is not valid. Using default [module] option. $ANSI_RESET\n")
-
-                ModuleOption().init()
-            }
-        }
+        return "$newInfo$additionalInfo$ANSI_RESET"
     }
 }

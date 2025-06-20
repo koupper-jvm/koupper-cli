@@ -11,7 +11,6 @@ class UndefinedCommand : Command() {
     }
 
     override fun execute(vararg args: String): String {
-        println("\n$RED_BACKGROUND_203$ANSI_WHITE The command '${args[0]}' is undefined. $ANSI_RESET \n")
-        return ""
+        return "\n$RED_BACKGROUND_203$ANSI_WHITE The command '${args[0]}' is undefined. $ANSI_RESET \n"
     }
 }

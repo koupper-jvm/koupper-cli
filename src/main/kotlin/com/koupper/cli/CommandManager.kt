@@ -5,8 +5,6 @@ import com.koupper.cli.commands.*
 import com.koupper.cli.commands.AvailableCommands.HELP
 import com.koupper.cli.commands.AvailableCommands.NEW
 import com.koupper.cli.commands.AvailableCommands.RUN
-import javafx.application.Application.launch
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.*
@@ -51,29 +49,19 @@ private fun checkForUpdatesFrom(baseDate: String) {
 
 class CommandManager {
     fun process(arg: Array<String>): String {
-        return when {
-            arg.isEmpty() -> {
-                DefaultCommand().execute()
-                "Default command executed."
-            }
-
-            isFlagVersion(arg[0]) -> {
-                DefaultCommand().showDescription()
-                "Version description shown."
-            }
-
-            getCommandByName(arg[0]) is UndefinedCommand -> {
-                val undefinedCommand = getCommandByName(arg[0]) as UndefinedCommand
-                undefinedCommand.execute(arg[0])
-                "Undefined command executed: ${arg[0]}"
-            }
-
-            else -> {
-                val command = getCommandByName(arg[0])
-                val args = this.getArgsFrom(arg)
-                command.execute(*args)
-            }
+        if (this.isFlagVersion(arg[1])) {
+            return DefaultCommand().showDescription()
         }
+
+        val command = getCommandByName(arg[1])
+
+        if (command is UndefinedCommand) {
+            return command.execute(arg[1])
+        }
+
+        val args = this.getArgsFrom(arg)
+
+        return command.execute(arg[0], *args)
     }
 
     fun notifyAboutUpdate(baseDate: String) {
@@ -81,7 +69,7 @@ class CommandManager {
 
         val updateInfo = File("$userPath/.koupper/helpers/.update_info")
 
-        when (readLine()) {
+        when (readlnOrNull()) {
             "y", "Y" -> {
                 val content = URL("https://lib-installer.s3.amazonaws.com/updateme.txt").readText()
 
@@ -111,15 +99,15 @@ class CommandManager {
     }
 
     private fun isFlagVersion(input: String): Boolean {
-        return input == "-v" || input == "--v" || input == "--version"
+        return input == "-v" || input == "--v" || input == "--version" || input == "-version"
     }
 
     private fun getArgsFrom(arg: Array<String>): Array<String> {
-        return if (arg.size > 1) arg.sliceArray(1 until arg.size) else emptyArray()
+        return if (arg.size > 2) arg.sliceArray(2 until arg.size) else emptyArray()
     }
 }
 
-fun main(args: Array<String>) = runBlocking {
+fun main() = runBlocking {
     val scope = CoroutineScope(Dispatchers.Default)
 
     scope.launch {
@@ -168,40 +156,28 @@ fun startSocketServer(commandManager: CommandManager, scope: CoroutineScope) {
                     val writer = socket.getOutputStream().bufferedWriter()
 
                     val command = reader.readLine()?.trim()
-                    if (command.isNullOrBlank()) {
-                        return@launch
+
+                    if (!command.isNullOrEmpty()) {
+                        val input = command.split(" ").toTypedArray()
+
+                        val response: String
+
+                        if (input.size == 1) {
+                            response = DefaultCommand().execute()
+                        } else {
+                            println("📥 Comando recibido en koupper-cli: $command")
+
+                            response = commandManager.process(input)
+                        }
+
+                        println("📥 Response cli: $response")
+                        writer.write(response)
+                        writer.flush()
                     }
-
-                    println("📥 Comando recibido en koupper-cli: $command")
-
-                    val response = commandManager.process(command.split(" ").toTypedArray())
-
-                    writer.write(response)
-                    writer.flush()
                 } catch (e: Exception) {
                     println("⚠️ Error en la conexión: ${e.message}")
                 }
             }
-        }
-    }
-}
-
-suspend fun listenForExternalCommands(commandManager: CommandManager) {
-    var lastModified = commandFile.lastModified()
-
-    while (true) {
-        try {
-            if (commandFile.exists() && commandFile.length() > 0 && commandFile.lastModified() > lastModified) {
-                val commandText = commandFile.readText().trim()
-                if (commandText.isNotEmpty()) {
-                    commandManager.process(commandText.split(" ").toTypedArray())
-                    commandFile.writeText("")
-                    lastModified = commandFile.lastModified()
-                }
-            }
-            delay(2000)
-        } catch (e: Exception) {
-            println("⚠️ Error loading commands file: ${e.message}")
         }
     }
 }

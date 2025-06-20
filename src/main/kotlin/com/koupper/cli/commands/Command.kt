@@ -15,18 +15,18 @@ abstract class Command {
 
     abstract fun name(): String
 
-    open fun showUsage() {
-        println(" ${ANSI_YELLOW_229}- Usage:$ANSI_RESET")
+    open fun showUsage(): String {
+        val usageHeader = " ${ANSI_YELLOW_229}- Usage examples:$ANSI_RESET"
 
-        println("   $usage")
+        return "\n$usageHeader $usage"
     }
 
-    open fun showDescription() {
-        println("\n  $ANSI_YELLOW_229 $description \n")
+    open fun showDescription(): String {
+        return "$ANSI_YELLOW_229$description"
     }
 
-    open fun showArguments() {
-        println(" ${ANSI_YELLOW_229}- Commands:$ANSI_RESET")
+    open fun showArguments(): String {
+        val argHeader = "\n ${ANSI_YELLOW_229}- Commands:$ANSI_RESET"
 
         var maxLengthOfCommand = 0
 
@@ -36,16 +36,18 @@ abstract class Command {
             }
         }
 
+        var finalCommandInfo = ""
+
         this.arguments.forEach { (commandName, description) ->
             val message = commandName.padEnd(maxLengthOfCommand + 3)
 
-            println("   $ANSI_GREEN_155$message$ANSI_RESET$description")
+            finalCommandInfo += "   $ANSI_GREEN_155$message$ANSI_RESET$description\n"
         }
 
-        println()
+        return "$argHeader    \n$finalCommandInfo"
     }
 
-    open fun showAdditionalInformation() {
-        println("$ANSI_YELLOW_229 $additionalInformation")
+    open fun showAdditionalInformation(): String {
+        return "$ANSI_YELLOW_229$additionalInformation"
     }
 }

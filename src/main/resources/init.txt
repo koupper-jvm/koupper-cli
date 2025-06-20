@@ -1,17 +1,15 @@
 import com.koupper.octopus.process.ScriptProcessor
 
-val setup: (ScriptProcessor) -> Unit = { processor ->
+val setup: (ScriptProcessor) -> ScriptProcessor = { processor ->
     processor.register(
-        "process-project-name",
-        mutableMapOf(
-            "server.port" to "8080",
-            "server.rootUrl" to "api/v1"
-        ),
+        "project-name",
         "LOCAL_AWS_DEPLOYMENT",
         "1.0.0",
-        "dev.example",
+        "ninja.thedeveloper.registry.service",
         mapOf(
-            "idForTheScript" to "relative/path/to/script.kts",
+            "registration" to "register-user.kts",
         )
     ).run()
+
+    processor
 }
