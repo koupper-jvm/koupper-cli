@@ -3,6 +3,7 @@ package com.koupper.cli
 import com.koupper.cli.ANSIColors.ANSI_RED
 import com.koupper.cli.commands.*
 import com.koupper.cli.commands.AvailableCommands.HELP
+import com.koupper.cli.commands.AvailableCommands.MODULE
 import com.koupper.cli.commands.AvailableCommands.NEW
 import com.koupper.cli.commands.AvailableCommands.RUN
 import kotlinx.coroutines.delay
@@ -48,6 +49,15 @@ private fun checkForUpdatesFrom(baseDate: String) {
 
 
 class CommandManager {
+    companion object {
+        val commands: Map<String, Command> = mapOf(
+            HELP to HelpCommand(),
+            NEW to NewCommand(),
+            RUN to RunCommand(),
+            MODULE to ModuleCommand()
+        )
+    }
+
     fun process(arg: Array<String>): String {
         if (this.isFlagVersion(arg[1])) {
             return DefaultCommand().showDescription()
@@ -90,12 +100,7 @@ class CommandManager {
     }
 
     fun getCommandByName(input: String): Command {
-        return when (input) {
-            HELP -> HelpCommand()
-            NEW -> NewCommand()
-            RUN -> RunCommand()
-            else -> UndefinedCommand()
-        }
+        return commands[input] ?: UndefinedCommand()
     }
 
     private fun isFlagVersion(input: String): Boolean {

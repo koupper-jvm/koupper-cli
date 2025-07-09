@@ -1,15 +1,17 @@
-import com.koupper.octopus.process.ScriptProcessor
+import com.koupper.container.app
+import com.koupper.octopus.annotations.Export
+import com.koupper.octopus.process.ModuleProcessor
 
-val setup: (ScriptProcessor) -> ScriptProcessor = { processor ->
-    processor.register(
-        "project-name",
-        "LOCAL_AWS_DEPLOYMENT",
-        "1.0.0",
-        "ninja.thedeveloper.registry.service",
-        mapOf(
-            "registration" to "register-user.kts",
-        )
-    ).run()
+@Export
+val setup: (ModuleProcessor) -> String = { processor ->
+    processor.name("module name")
+        .type("module type")
+        .version("module version")
+        .packageName("module package")
+        .scripts(mapOf(
+            "handlerName" to "script-name.kts",
+        ))
+        .run()
 
-    processor
+    "SUCCESS"
 }
