@@ -3,7 +3,7 @@ package com.koupper.cli.commands.jobs
 import com.koupper.cli.commands.RunCommand
 import java.io.File
 
-class JobRunWorkerHandler : JobSubcommandHandler {
+class JobListHandler: JobSubcommandHandler {
     override fun handle(context: String, args: Array<String>): String {
         val queue = args.find { it.startsWith("--queue=") }?.substringAfter("=") ?: "default"
         val driver = getJobDriverFromConfig(context) ?: "file"
@@ -20,7 +20,7 @@ class JobRunWorkerHandler : JobSubcommandHandler {
 
         @Export
         val setup: (JobRunner) -> Unit = { runner ->
-            runner.runPendingJobs(queue = "$queue", driver = "$driver")
+            runner.listJobs(queue = "$queue", driver = "$driver")
         }
     """.trimIndent()
 

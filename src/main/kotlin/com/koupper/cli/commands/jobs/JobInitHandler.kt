@@ -1,10 +1,9 @@
 package com.koupper.cli.commands.jobs
 
-import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
-import com.koupper.cli.ANSIColors.ANSI_RESET
 import com.koupper.cli.ANSIColors.ANSI_GREEN_155
 import com.koupper.cli.ANSIColors.ANSI_RED
-import com.koupper.cli.deserializer.createDeserializer
+import com.koupper.cli.ANSIColors.ANSI_RESET
+import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
 import java.io.File
 
 class JobInitHandler : JobSubcommandHandler {

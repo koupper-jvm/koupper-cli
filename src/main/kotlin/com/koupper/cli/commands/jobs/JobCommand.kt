@@ -85,6 +85,7 @@ class JobCommand : Command() {
         return when (subcommand) {
             "init" -> JobInitHandler().handle(context, arrayOf(*args))
             "run-worker" -> JobRunWorkerHandler().handle(context, arrayOf(*args))
+            "list" -> JobListHandler().handle(context, arrayOf(*args))
             /*"build-worker" -> JobBuildWorkerHandler().handle(args)
             "list" -> JobListHandler().handle(args)
             "status" -> JobStatusHandler().handle(args)
