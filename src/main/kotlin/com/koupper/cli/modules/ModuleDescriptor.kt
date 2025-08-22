@@ -36,7 +36,7 @@ class ModuleDescriptor(private val moduleDir: File) {
         return CommandManager.commands["run"]?.execute(moduleDir.path, file.name ,"--info") ?: ""
     }
 
-    fun describeConfig(file: File): String {
+    private fun describeConfig(file: File): String {
         val sb = StringBuilder()
         val GREEN = "\u001B[32m"
         val RED = "\u001B[31m"
@@ -141,11 +141,5 @@ class ModuleDescriptor(private val moduleDir: File) {
             else -> "$yamlValue $red❌ Differs from $jsonValue$reset"
         }
     }
-
-}
-
-fun main() {
-    ModuleDescriptor(File("C:\\Users\\dosek\\develop\\quizztea.com\\quizztea-auth-service-scripts"))
-        .describeConfig(File("C:\\Users\\dosek\\develop\\quizztea.com\\quizztea-auth-service-scripts\\registration-application.yml"))
 
 }

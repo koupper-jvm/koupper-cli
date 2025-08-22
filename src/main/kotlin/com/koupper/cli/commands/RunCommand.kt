@@ -18,7 +18,7 @@ class RunCommand : Command() {
         super.description = "\n   Run a kotlin script\n"
         super.arguments = emptyMap()
         super.additionalInformation = """
-   visit for more info: https://koupper.com/cli/commands/run
+   For more info: https://koupper.com/cli/commands/run
         """
     }
 
@@ -81,5 +81,9 @@ class RunCommand : Command() {
 
     override fun name(): String {
         return AvailableCommands.RUN
+    }
+
+    override fun showArguments(): String {
+        return ""
     }
 }

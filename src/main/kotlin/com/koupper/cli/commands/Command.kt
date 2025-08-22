@@ -22,7 +22,7 @@ abstract class Command {
     }
 
     open fun showDescription(): String {
-        return "$ANSI_YELLOW_229$description"
+        return "$ANSI_YELLOW_229$description$ANSI_RESET"
     }
 
     open fun showArguments(): String {

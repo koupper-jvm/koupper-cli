@@ -4,12 +4,12 @@ import com.koupper.octopus.process.ModuleProcessor
 
 @Export
 val setup: (ModuleProcessor) -> String = { processor ->
-    processor.name("module name")
-        .type("module type")
-        .version("module version")
-        .packageName("module package")
+    processor.name("%MODULE_NAME%")
+        .type("%MODULE_TYPE%")
+        .version("%MODULE_VERSION%")
+        .packageName("%MODULE_PACKAGE%")
         .scripts(mapOf(
-            "handlerName" to "script-name.kts",
+            "%HANDLER_NAME%" to "%SCRIPT_NAME%",
         ))
         .run()
 

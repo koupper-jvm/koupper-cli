@@ -3,6 +3,7 @@ package com.koupper.cli.commands
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.koupper.cli.ANSIColors.ANSI_GREEN_155
 import com.koupper.cli.ANSIColors.ANSI_RESET
 import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
 import com.koupper.cli.CommandManager
@@ -12,6 +13,31 @@ import java.io.File
 import java.io.InputStream
 
 class ModuleCommand : Command() {
+    init {
+        super.name = MODULE
+        super.usage = """
+            
+   koupper $ANSI_GREEN_155$name$ANSI_RESET -i -d
+    """
+        super.description = """
+   The ${ANSI_GREEN_155}-i${ANSI_RESET}${ANSI_YELLOW_229} flag shows files inside the module, including their tags and return types (signatures).
+   If the module is a Gradle project, it also detects HTTP controllers and lists their endpoints and handlers.
+
+   The ${ANSI_GREEN_155}-d${ANSI_RESET}${ANSI_YELLOW_229} flag displays detailed module-level information, such as:${ANSI_RESET}
+     - Scripts registered via ModuleProcessor
+     - HTTP contract configuration from the YML file
+     - Synchronization status of scripts and handlers with the module
+     - Synchronization between the HTTP contract and the module's implementation${ANSI_RESET}
+    """
+        super.arguments = mapOf(
+            "-i" to "Displays module files with tags and function signatures. Also detects controllers in Gradle projects.",
+            "-d" to "Displays ModuleProcessor info, HTTP contracts, synchronization status for scripts and handlers, and differences between module scripts and project modules."
+        )
+        super.additionalInformation = """
+   For more info: https://koupper.com/cli/commands/module
+    """
+    }
+
 
     private val icons = mapOf(
         "[init]" to "\u001B[35m[init]\u001B[0m",
@@ -23,8 +49,18 @@ class ModuleCommand : Command() {
         "[kts folder]" to "\u001B[33m[kts folder]\u001B[0m",
         "[hndlrs]" to "\u001B[34m[handlers]\u001B[0m",
         "[ctrls]" to "\u001B[31m[ctrls]\u001B[0m",
-        "[script]" to "\u001B[36m[script]\u001B[0m"
+        "[script]" to "\u001B[36m[script]\u001B[0m",
+        "[file]"    to "\u001B[90m[driver: file]\u001B[0m",
+        "[sqs]"    to "\u001B[90m[driver: sqs]\u001B[0m",
+        "[default]" to "\u001B[37m[queue: default]\u001B[0m"
     )
+
+    private val labelColor = mapOf(
+        "driver" to "\u001B[94m",
+        "queue"  to "\u001B[94m",
+    )
+
+    private val tokenRegex = Regex("""\[(.*?)\]""")
 
     override fun name(): String = MODULE
 
@@ -85,6 +121,26 @@ class ModuleCommand : Command() {
         File(path).outputStream().use { this.copyTo(it) }
     }
 
+    private fun colorizeTag(tag: String): String =
+        tokenRegex.replace(tag) { m ->
+            val token = m.value
+            icons[token]?.let { return@replace it }
+
+            val inner = m.groupValues[1]
+            val idx = inner.indexOf(':')
+            if (idx >= 0) {
+                val labelRaw = inner.substring(0, idx).trim()
+                val labelKey = labelRaw.lowercase()
+                val value = inner.substring(idx + 1).trim()
+                val color = labelColor[labelKey]
+                if (color != null && value.isNotEmpty()) {
+                    return@replace "[$labelRaw: ${color}$value\u001B[0m]"
+                }
+            }
+
+            token
+        }
+
     private fun scanModules(): String {
         val result = StringBuilder()
         val jsonFile = File(System.getProperty("user.home"), ".koupper/helpers/module-analysis.json")
@@ -102,14 +158,14 @@ class ModuleCommand : Command() {
 
         for (folder in folders) {
             val folderName = folder["folder"] as String
-            val tags = (folder["tags"] as? List<String>)?.map { tag -> icons[tag] ?: tag } ?: emptyList()
+            val tags = (folder["tags"] as? List<String>)?.map(::colorizeTag) ?: emptyList()
             val padded = folderName.padEnd(maxNameLength + 2)
             result.append("$padded${tags.joinToString(" ")}\n")
         }
 
         for (file in files) {
             val fileName = file["file"] as String
-            val tags = (file["tags"] as? List<String>)?.map { tag -> icons[tag] ?: tag } ?: emptyList()
+            val tags = (file["tags"] as? List<String>)?.map(::colorizeTag) ?: emptyList()
             val signature = file["signature"]?.toString() ?: ""
             val padded = fileName.padEnd(maxNameLength + 2)
             result.append("$padded${tags.joinToString(" ")} $signature\n")

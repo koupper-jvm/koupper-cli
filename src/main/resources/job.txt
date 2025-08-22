@@ -1,0 +1,14 @@
+import com.koupper.container.app
+import com.koupper.octopus.annotations.Export
+import com.koupper.octopus.process.ModuleProcessor
+
+@Export
+val setup: (RegisteredJobHelper) -> String = { helper ->
+    helper.register(
+        exportName = "registerIglyUser",
+        scriptPath = pathToThisScript,
+        context = currentContext
+    )
+
+    "SUCCESS"
+}

@@ -44,9 +44,9 @@ class HelpCommand : Command() {
                     else -> {
                         val description = command.showDescription()
                         val usage = command.showUsage()
+                        val arguments = command.showArguments()
                         val additionalInformation = command.showAdditionalInformation()
-                        val arguments = if (command.arguments.isNotEmpty()) command.showArguments() else ""
-                        "$description$usage$additionalInformation$arguments"
+                        "$description$usage$arguments$additionalInformation"
                     }
                 }
             }
