@@ -1,7 +1,17 @@
-import com.koupper.octopus.managers.ScriptManager
+import com.koupper.container.app
+import com.koupper.octopus.annotations.Export
+import com.koupper.octopus.process.ModuleProcessor
 
-val init: (ScriptManager) -> ScriptManager = {
-    it.runScript("yourScript.kts") // the params are optional as a map in second place to 'runScript' function.
+@Export
+val setup: (ModuleProcessor) -> String = { processor ->
+    processor.name("%MODULE_NAME%")
+        .type("%MODULE_TYPE%")
+        .version("%MODULE_VERSION%")
+        .packageName("%MODULE_PACKAGE%")
+        .scripts(mapOf(
+            "%HANDLER_NAME%" to "%SCRIPT_NAME%",
+        ))
+        .run()
 
-    //it.runScript("yourScript.kts", mapOf("key" to value))
+    "SUCCESS"
 }

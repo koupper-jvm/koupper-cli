@@ -1,7 +1,7 @@
-import com.koupper.container.interfaces.Container
+import com.koupper.container.app
+import com.koupper.octopus.annotations.Export
 
-val myScript: (Container) -> Container = { container ->
-    println("Hello World!")
-
-    container
+@Export
+val myScript: () -> String = {
+    "Hello world"
 }

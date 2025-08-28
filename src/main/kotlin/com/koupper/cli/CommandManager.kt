@@ -3,18 +3,24 @@ package com.koupper.cli
 import com.koupper.cli.ANSIColors.ANSI_RED
 import com.koupper.cli.commands.*
 import com.koupper.cli.commands.AvailableCommands.HELP
+import com.koupper.cli.commands.AvailableCommands.MODULE
 import com.koupper.cli.commands.AvailableCommands.NEW
 import com.koupper.cli.commands.AvailableCommands.RUN
+import com.koupper.cli.commands.AvailableCommands.JOB
+import com.koupper.cli.commands.jobs.JobCommand
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import java.io.File
 import java.io.IOException
+import java.net.ServerSocket
 import java.net.URL
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 private val userPath = System.getProperty("user.home")
+private val commandFile = File("$userPath/.koupper/helpers/koupper-commands.txt")
 
 private fun checkForUpdatesFrom(baseDate: String) {
     try {
@@ -45,30 +51,30 @@ private fun checkForUpdatesFrom(baseDate: String) {
 
 
 class CommandManager {
-    fun process(arg: Array<String>) {
-        if (arg.isEmpty()) {
-            DefaultCommand().execute()
+    companion object {
+        val commands: Map<String, Command> = mapOf(
+            HELP to HelpCommand(),
+            NEW to NewCommand(),
+            RUN to RunCommand(),
+            MODULE to ModuleCommand(),
+            JOB to JobCommand()
+        )
+    }
 
-            return
+    fun process(arg: Array<String>): String {
+        if (this.isFlagVersion(arg[1])) {
+            return DefaultCommand().showDescription()
         }
 
-        if (this.isFlagVersion(arg[0])) {
-            DefaultCommand().showDescription()
-
-            return
-        }
-
-        val command = getCommandByName(arg[0])
+        val command = getCommandByName(arg[1])
 
         if (command is UndefinedCommand) {
-            command.execute(arg[0])
-
-            return
+            return command.execute(arg[1])
         }
 
         val args = this.getArgsFrom(arg)
 
-        command.execute(*args)
+        return command.execute(arg[0], *args)
     }
 
     fun notifyAboutUpdate(baseDate: String) {
@@ -76,7 +82,7 @@ class CommandManager {
 
         val updateInfo = File("$userPath/.koupper/helpers/.update_info")
 
-        when (readLine()) {
+        when (readlnOrNull()) {
             "y", "Y" -> {
                 val content = URL("https://lib-installer.s3.amazonaws.com/updateme.txt").readText()
 
@@ -97,51 +103,89 @@ class CommandManager {
     }
 
     fun getCommandByName(input: String): Command {
-        return when (input) {
-            HELP -> HelpCommand()
-            NEW -> NewCommand()
-            RUN -> RunCommand()
-            else -> UndefinedCommand()
-        }
+        return commands[input] ?: UndefinedCommand()
     }
 
     private fun isFlagVersion(input: String): Boolean {
-        return input == "-v" || input == "--v" || input == "--version"
+        return input == "-v" || input == "--v" || input == "--version" || input == "-version"
     }
 
     private fun getArgsFrom(arg: Array<String>): Array<String> {
-        return if (arg.size > 1) arg.sliceArray(1 until arg.size) else emptyArray()
+        return if (arg.size > 2) arg.sliceArray(2 until arg.size) else emptyArray()
     }
 }
 
-fun main(args: Array<String>) = runBlocking {
-    val commandManager = CommandManager()
+fun main() = runBlocking {
+    val scope = CoroutineScope(Dispatchers.Default)
 
-    val versionFile = File("$userPath/.koupper/helpers/.update_info")
+    scope.launch {
+        val commandManager = CommandManager()
+        val versionFile = File("$userPath/.koupper/helpers/.update_info")
 
-    if (versionFile.exists()) {
-        val updateInfo = versionFile.readLines().first()
+        if (versionFile.exists()) {
+            val updateInfo = versionFile.readLines().firstOrNull() ?: ""
 
-        val date = "\\D".toRegex().split(updateInfo).first {
-            it.isNotEmpty()
+            val date = "\\D".toRegex().split(updateInfo).firstOrNull { it.isNotEmpty() } ?: "0"
+
+            val timeElapsedSinceLastRequest = Date().time - Date(date.toLong()).time
+            val hoursElapsedSinceLastRequest = TimeUnit.MILLISECONDS.toHours(timeElapsedSinceLastRequest)
+
+            if (hoursElapsedSinceLastRequest >= 24) {
+                if ("true|false".toRegex().find(updateInfo)?.value?.toBoolean() == true) {
+                    if (hoursElapsedSinceLastRequest.rem(4) == 0L) {
+                        commandManager.notifyAboutUpdate(date)
+                    }
+                } else {
+                    launch { checkForUpdatesFrom(date) }
+                }
+            }
         }
 
-        val timeElapsedSinceLastRequest = Date().time - Date(date.toLong()).time
+        startSocketServer(commandManager, this)
+    }
 
-        val hoursElapsedSinceLastRequest = TimeUnit.MILLISECONDS.toHours(timeElapsedSinceLastRequest)
+    while (true) {
+        delay(1000)
+    }
+}
 
-        if (hoursElapsedSinceLastRequest >= 24) {
-            if ("true|false".toRegex().find(updateInfo)!!.value.toBoolean()) {
-                if (hoursElapsedSinceLastRequest.rem(4) == 0L) {
-                    commandManager.notifyAboutUpdate(date)
-                }
-            } else {
-                launch {
-                    checkForUpdatesFrom(date)
+fun startSocketServer(commandManager: CommandManager, scope: CoroutineScope) {
+    val serverSocket = ServerSocket(9999)
+    println("🔄 Servidor de sockets iniciado en el puerto 9999...")
+
+    while (true) {
+        val clientSocket = serverSocket.accept()
+        println("🔗 Nueva conexión a koupper-cli: ${clientSocket.inetAddress.hostAddress}")
+
+        scope.launch {
+            clientSocket.use { socket ->
+                try {
+                    val reader = socket.getInputStream().bufferedReader()
+                    val writer = socket.getOutputStream().bufferedWriter()
+
+                    val command = reader.readLine()?.trim()
+
+                    if (!command.isNullOrEmpty()) {
+                        val input = command.split(" ").toTypedArray()
+
+                        val response: String
+
+                        if (input.size == 1) {
+                            response = DefaultCommand().execute()
+                        } else {
+                            println("📥 Comando recibido en koupper-cli: $command")
+
+                            response = commandManager.process(input)
+                        }
+
+                        println("📥 Response cli: $response")
+                        writer.write(response)
+                        writer.flush()
+                    }
+                } catch (e: Exception) {
+                    println("⚠️ Error en la conexión: ${e.message}")
                 }
             }
         }
     }
-
-    commandManager.process(args)
 }

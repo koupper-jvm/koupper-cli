@@ -5,10 +5,7 @@ import com.koupper.cli.ANSIColors.ANSI_RESET
 import com.koupper.cli.ANSIColors.ANSI_WHITE
 import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.Paths
-import java.util.stream.Collectors
-import kotlin.system.exitProcess
+import java.net.Socket
 
 val isSingleFileName: (String) -> Boolean = {
     it.contains("^[a-zA-Z0-9]+.kts$".toRegex())
@@ -17,73 +14,76 @@ val isSingleFileName: (String) -> Boolean = {
 class RunCommand : Command() {
     init {
         super.name = "run"
-        super.usage =
-                "koupper ${ANSI_GREEN_155}$name${ANSI_RESET} [${ANSI_GREEN_155}kotlinScriptName${ANSI_RESET}]"
-        super.description = "Run a kotlin script"
+        super.usage = "\n   koupper ${ANSI_GREEN_155}$name${ANSI_RESET} ${ANSI_GREEN_155}script-name.kts${ANSI_RESET}\n"
+        super.description = "\n   Run a kotlin script\n"
         super.arguments = emptyMap()
         super.additionalInformation = """
-   visit for more info: https://koupper.com/cli/commands/run
+   For more info: https://koupper.com/cli/commands/run
         """
     }
 
-    override fun execute(vararg args: String) {
-        if (args.isNotEmpty() && args[0].isNotEmpty()) {
-            if (".kts" !in args[0]) {
-                println("\n${ANSI_YELLOW_229} The file must end with [.kts] extension or use ${ANSI_WHITE}koupper new module [${ANSI_GREEN_155}nameOfModule${ANSI_WHITE}]$ANSI_YELLOW_229.$ANSI_RESET\n")
+    override fun execute(vararg args: String): String {
+        val context = args[0]
 
-                exitProcess(7)
+        if (args.size > 1 && args[1].isNotEmpty()) {
+            if (".kts" !in args[1] && ".kt" !in args[1]) {
+                return "\n${ANSI_YELLOW_229} The file must end with [.kts || .kt] extension.${ANSI_RESET}\n"
             }
 
-            if (args.size > 1) {
-                val params = args[1]
+            val executionArgs = args.sliceArray(2 until args.size)
 
-                this.execute(args[0], params)
-
-                return
+            return if (executionArgs.isNotEmpty()) {
+                execute(context = context, args[1], args[2])
+            } else {
+                execute(context = context, args[1])
             }
-
-            this.execute(args[0])
-
-            return
         }
 
-        val directories = Files.list(Paths.get(".")).collect(Collectors.partitioningBy { Files.isDirectory(it) })
+        val initFile = args[0] + File.separator + "init.kts"
 
-        val initFile = directories[false]?.filter {
-            it.toString() == "./init.kts"
-        }
-
-        if (initFile?.isEmpty()!!)
-            println("\n ${ANSI_WHITE}'init.kts' not found. Create one using: ${ANSI_YELLOW_229}koupper new file:init${ANSI_WHITE} or start creating a script.\n")
-        else {
-            val finalInitPath = Paths.get("").toAbsolutePath().toString() + "/init.kts"
-
-            this.execute(finalInitPath)
+        return if (!File(initFile).exists()) {
+            return "\n ${ANSI_WHITE}'init.kts' file not found. Create one using: ${ANSI_YELLOW_229}koupper new file:init${ANSI_WHITE} or start writing a script.\n"
+        } else {
+            execute(context, "init.kts")
         }
     }
 
-    private fun execute(filePath: String, params: String = "EMPTY_PARAMS") {
-        var finalFilePath = ""
+    private fun execute(context: String, filePath: String, params: String = "EMPTY_PARAMS"): String {
+        if (!File(context + File.separator + filePath).exists()) {
+            return "\n${ANSI_YELLOW_229} The script ${File(filePath).name} does not exist.${ANSI_RESET}\n"
+        }
 
-        finalFilePath += if (isSingleFileName(filePath)) {
-            Paths.get("").toAbsolutePath().toString() + "/$filePath "
-        } else {
-            filePath
-        }.trim()
+        return sendToOctopus(context, filePath, params)
+    }
 
-        val userPath = System.getProperty("user.home")
+    private fun sendToOctopus(context: String, script: String, params: String): String {
+        return try {
+            val socket = Socket("localhost", 9998)
+            val writer = socket.getOutputStream().bufferedWriter()
+            val reader = socket.getInputStream().bufferedReader()
 
-        val file = File("$userPath/.koupper/helpers/octopus-parameters.txt")
-        file.writeText("$finalFilePath $params")
-        file.createNewFile()
-        file.setExecutable(true)
-        file.setReadable(true)
-        file.setWritable(true)
 
-        exitProcess(0)
+            println("🚀 Enviando comando a octopus: $context $script $params")
+            writer.write("$context $script $params")
+            writer.newLine()
+            writer.flush()
+
+            val response = reader.readText()
+            println("📤 Respuesta de octopus: $response")
+
+            socket.close()
+            response
+        } catch (e: Exception) {
+            println("⚠️ Error al enviar comando a octopus: ${e.message}")
+            "Error: ${e.message}"
+        }
     }
 
     override fun name(): String {
         return AvailableCommands.RUN
+    }
+
+    override fun showArguments(): String {
+        return ""
     }
 }
