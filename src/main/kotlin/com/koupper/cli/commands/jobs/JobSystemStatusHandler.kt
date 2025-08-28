@@ -3,30 +3,32 @@ package com.koupper.cli.commands.jobs
 import com.koupper.cli.commands.RunCommand
 import java.io.File
 
-class JobRunWorkerHandler : JobSubcommandHandler {
+class JobSystemStatusHandler : JobSubcommandHandler {
     override fun handle(context: String, args: Array<String>): String {
-        val queueArg = args.find { it.startsWith("--queue=") }?.substringAfter("=")
-        val jobIdArg = args.find { it.startsWith("--jobId=") }?.substringAfter("=")
-
-        val queue = queueArg ?: getJobQueueFromConfig(context) ?: "default"
-        val jobId: String? = jobIdArg?.takeIf { it.isNotBlank() }
-        val driver = getJobDriverFromConfig(context) ?: "file"
+        val driver = getJobDriverFromConfig(context) ?: "❓ (no driver found)"
+        val queue = getJobQueueFromConfig(context) ?: "❓ (no queue found)"
 
         val scriptPath = "$context/job-runner.kts"
-        File(scriptPath).writeText(generateJobRunnerScript(queue, driver, jobId))
+        File(scriptPath).writeText(generateJobDisplayerScript(queue, driver))
 
-        return RunCommand().execute(context, "job-runner.kts")
+        val statusHeader = """
+   🧠 Current Job Configuration
+   ─────────────────────────────
+   🛠️  Driver: $driver
+   📦  Queue:  $queue        
+        """
+
+        return statusHeader + RunCommand().execute(context, "job-runner.kts")
     }
 
-    private fun generateJobRunnerScript(queue: String, driver: String, jobId: String?): String {
-        val jobIdLiteral = jobId?.let { "\"$it\"" } ?: "null"
+    private fun generateJobDisplayerScript(queue: String, driver: String): String {
         return """
             import com.koupper.octopus.annotations.Export
-            import com.koupper.orchestrator.JobRunner
+            import com.koupper.orchestrator.JobDisplayer
 
             @Export
-            val setup: (JobRunner) -> Unit = { runner ->
-                runner.runPendingJobs(queue = "$queue", driver = "$driver", jobId = $jobIdLiteral)
+            val setup: (JobDisplayer) -> Unit = { displayer ->
+                displayer.showStatus(queue = "$queue", driver = "$driver")
             }
         """.trimIndent()
     }

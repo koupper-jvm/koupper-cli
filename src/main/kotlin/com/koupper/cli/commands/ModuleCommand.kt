@@ -65,56 +65,65 @@ class ModuleCommand : Command() {
     override fun name(): String = MODULE
 
     override fun execute(vararg args: String): String {
-        val flags = mutableListOf<String>()
+        val flags = mutableSetOf<String>()
         var moduleName: String? = null
 
         for (arg in args.drop(1)) {
-            if (arg.startsWith("-")) {
-                flags.add(arg)
-            } else {
-                moduleName = arg
-                break
-            }
+            if (arg.startsWith("-")) flags += arg else { moduleName = arg; break }
         }
 
         val rawCurrent = args.getOrNull(0) ?: "."
         val currentDir = File(rawCurrent).absoluteFile
-        val results = mutableListOf<String>()
+        val libsDir = File(currentDir, "libs")
 
-        if (flags.contains("-i")) {
-            val koupperHelpersDirectory = System.getProperty("user.home") + File.separator + ".koupper" + File.separator + "helpers" + File.separator
+        val octopusJar = libsDir.listFiles { f ->
+            f.isFile && f.name.startsWith("octopus-") && f.name.endsWith(".jar")
+        }?.maxByOrNull { it.lastModified() }
+
+        val octopusDependencyInfo = if (octopusJar != null) {
+            val name = octopusJar.name
+            val version = name.removePrefix("octopus-").removeSuffix(".jar")
+            "📦 Octopus dependency: $name (version $version)\n"
+        } else {
+            "⚠️ Octopus dependency not found in ${libsDir.absolutePath}\n"
+        }
+
+        val runInspect   = "-i" in flags || flags.isEmpty()
+        val runDescribe  = "-d" in flags || flags.isEmpty()
+
+        val results = mutableListOf<String>()
+        val targetDir = if (moduleName != null) File(currentDir, moduleName) else currentDir
+        if (!targetDir.exists() || !targetDir.isDirectory) {
+            return "\n$ANSI_YELLOW_229 Module not found: ${targetDir.path} $ANSI_RESET\n"
+        }
+
+        if (runInspect) {
+            val koupperHelpersDirectory = System.getProperty("user.home") + File.separator +
+                    ".koupper" + File.separator + "helpers" + File.separator
             val finalScript = "${koupperHelpersDirectory}list.kts"
 
             this::class.java.classLoader.getResourceAsStream("list.txt")?.toFile(finalScript)
             val finalScriptContent = File(finalScript).readText(Charsets.UTF_8)
-
-            val targetDir = if (moduleName != null) File(currentDir, moduleName) else currentDir
-            if (!targetDir.exists() || !targetDir.isDirectory) {
-                return "\n$ANSI_YELLOW_229 Module not found: ${targetDir.path} $ANSI_RESET\n"
-            }
 
             val escapedPath = targetDir.path.replace("\\", "\\\\")
             val replacedScript = finalScriptContent.replace("%TARGET%", escapedPath)
             File(finalScript).writeText(replacedScript, Charsets.UTF_8)
 
             CommandManager.commands["run"]?.execute(koupperHelpersDirectory, "list.kts", "-l") ?: ""
-
-            val scanned = scanModules()
-            results.add(scanned)
+            results += scanModules()
         }
 
-        if (flags.contains("-d")) {
-            val descriptor = ModuleDescriptor(
-                if (moduleName != null) File(currentDir, moduleName) else currentDir
-            )
-            results.add(descriptor.describe())
+        if (runDescribe) {
+            val descriptor = ModuleDescriptor(targetDir)
+            results += descriptor.describe()
         }
 
         if (results.isEmpty()) {
-            return "\n$ANSI_YELLOW_229 No modules found.$ANSI_RESET\n"
+            return "\n$octopusDependencyInfo\n" +
+                    "$ANSI_YELLOW_229 No output produced. Try: -i (inspect), -d (describe), or both by default.$ANSI_RESET\n"
         }
 
-        return "\n" + results.joinToString("\n")
+        return "\n$octopusDependencyInfo\n" + results.joinToString("\n")
     }
 
     private fun InputStream.toFile(path: String) {
