@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.1.0] - 2025-08-28
+## [4.5.0] - 2025-08-28
 ### Added
 - New `job` command in CLI
 
