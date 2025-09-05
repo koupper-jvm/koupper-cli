@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored `ModuleCommand` to improve how it displays module information.
 - Modified the structure of `ApiConfig` to support the new format.
 - The `module` command now generates a default HTTP configuration for script types: `HANDLERS_CONTROLLERS_SCRIPTS`.
+- Updated CLI arguments for `JobCommand` (new flags, defaults, and help text).
 
 ---
 
