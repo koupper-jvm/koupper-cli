@@ -103,7 +103,7 @@ class ModuleCommand : Command() {
             val version = name.removePrefix("octopus-").removeSuffix(".jar")
             "📦 Octopus dependency: $name (version $version)\n"
         } else {
-            "⚠️ Octopus dependency not found in ${libDir.absolutePath}"
+            "⚠️ Octopus dependency not found in ${libDir.absolutePath}\n"
         }
 
         val results = mutableListOf<String>()
@@ -297,48 +297,60 @@ class ModuleCommand : Command() {
         val YELLOW = "\u001B[33m"
         val RESET = "\u001B[0m"
 
-        val objectMapper = jacksonObjectMapper()
-        val controllers = objectMapper.readValue<List<Map<String, Any?>>>(File(
+        val file = File(
             System.getProperty("user.home"),
             ".koupper/helpers/controllers.json"
-        ))
+        )
 
-        result.append("\n ⚙\uFE0F Controllers found:\n\n")
-        controllers.forEach { entry ->
-            val port = entry["port"] ?: "Unknown"
-            val controllerList = entry["controllers"] as? List<Map<String, Any?>> ?: emptyList()
+        if (!file.exists()) {
+            return "⚠️  No controllers found\n"
+        }
 
-            controllerList.forEach { controller ->
-                val name = controller["controller"] as? String ?: "Unknown"
-                val path = controller["path"] ?: "/"
-                val endpoints = controller["endpoints"] as? List<Map<String, Any?>> ?: emptyList()
+        try {
+            val objectMapper = jacksonObjectMapper()
+            val controllers = objectMapper.readValue<List<Map<String, Any?>>>(file)
 
-                result.append("🔹 Controller: ${CYAN}$name${RESET} (port ${YELLOW}$port${RESET}, base path: ${YELLOW}$path${RESET})\n")
-                if (endpoints.isEmpty()) {
-                    result.append("   └ No endpoints found.\n")
-                } else {
-                    endpoints.forEach { endpoint ->
-                        val method = endpoint["method"]
-                        val endpointPath = endpoint["path"]
-                        val consumes = endpoint["consumes"]
-                        val produces = endpoint["produces"]
-                        val function = endpoint["function"]
-                        val handler = endpoint["handler"]
+            result.append("\n ⚙️ Controllers found:\n\n")
+            controllers.forEach { entry ->
+                val port = entry["port"] ?: "Unknown"
+                val controllerList = entry["controllers"] as? List<Map<String, Any?>> ?: emptyList()
 
-                        result.append(
-                            """
-                       └ ${GREEN}${method ?: "Unknown"}${RESET} ${endpointPath}
-                           ↳ Function: ${CYAN}$function${RESET}
-                           ↳ Consumes: ${YELLOW}$consumes${RESET} | Produces: ${YELLOW}$produces${RESET}
-                           ↳ Handler: ${CYAN}$handler${RESET}
+                controllerList.forEach { controller ->
+                    val name = controller["controller"] as? String ?: "Unknown"
+                    val path = controller["path"] ?: "/"
+                    val endpoints = controller["endpoints"] as? List<Map<String, Any?>> ?: emptyList()
 
-                    """.trimIndent()
-                        )
+                    result.append("🔹 Controller: ${CYAN}$name$RESET (port ${YELLOW}$port$RESET, base path: ${YELLOW}$path$RESET)\n\n")
+                    if (endpoints.isEmpty()) {
+                        result.append("   └ No endpoints found.\n")
+                    } else {
+                        endpoints.forEach { endpoint ->
+                            val method = endpoint["method"]
+                            val endpointPath = endpoint["methodPath"]
+                            val consumes = endpoint["consumes"]
+                            val produces = endpoint["produces"]
+                            val function = endpoint["function"]
+                            val handler = endpoint["handler"]
+
+                            result.append(
+                                """
+                           └ ${GREEN}${method ?: "Unknown"}$RESET $endpointPath
+                               ↳ Function: ${CYAN}$function$RESET
+                               ↳ Consumes: ${YELLOW}$consumes$RESET | Produces: ${YELLOW}$produces$RESET
+                               ↳ Handler: ${CYAN}$handler$RESET
+
+                            """.trimIndent()
+                            ).append("\n")
+                        }
                     }
                 }
             }
-        }
 
-        return result.toString()
+            return result.toString()
+        } finally {
+            if (file.exists()) {
+                file.delete()
+            }
+        }
     }
 }
