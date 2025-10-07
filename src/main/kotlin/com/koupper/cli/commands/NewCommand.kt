@@ -48,34 +48,7 @@ class NewCommand : Command() {
                     }
                 }.toMap()
 
-                val name = params["name"]
-                val version = params["version"]
-                val packageName = params["package"]
                 val type = params["type"] ?: "EXECUTABLE"
-
-                if (name.isNullOrBlank() || version.isNullOrBlank() || packageName.isNullOrBlank()) {
-                    return "\n${ANSI_YELLOW_229}Missing required parameters. Required: name, version, package.$ANSI_RESET\n"
-                }
-
-                val finalInitFile = args[0] + File.separator + "init.kts"
-                this::class.java.classLoader.getResourceAsStream("init.txt")?.toFile(finalInitFile)
-
-                val finalScriptContent = File(finalInitFile).readText(Charsets.UTF_8)
-                val replacedScript = finalScriptContent
-                    .replace("%MODULE_NAME%", name)
-                    .replace("%MODULE_VERSION%", version)
-                    .replace("%MODULE_PACKAGE%", packageName)
-                    .replace("%MODULE_TYPE%", type)
-                    .replace("%HANDLER_NAME%", "executable")
-                    .replace("%SCRIPT_NAME%", "script.kts")
-
-                File(finalInitFile).writeText(replacedScript, Charsets.UTF_8)
-
-                this::class.java.classLoader.getResourceAsStream("script.txt")!!.use { input ->
-                    File(args[0], "script.kts").outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
 
                 if (type == "HANDLERS_CONTROLLERS_SCRIPTS") {
                     val yamlTemplate = this::class.java.classLoader.getResourceAsStream("templates/http-cfg.yml")!!
@@ -93,6 +66,34 @@ class NewCommand : Command() {
 
                     File(args[0], "$name.yml").writeText(replacedYaml, Charsets.UTF_8)
                 }
+
+                val name = params["name"]
+                val version = params["version"]
+                val packageName = params["package"]
+
+                if (name.isNullOrBlank() || version.isNullOrBlank() || packageName.isNullOrBlank()) {
+                    return "\n${ANSI_YELLOW_229}Missing required parameters. Required: name, version, package.$ANSI_RESET\n"
+                }
+
+                this::class.java.classLoader.getResourceAsStream("script.txt")!!.use { input ->
+                    File(args[0], "script.kts").outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+
+                val finalInitFile = args[0] + File.separator + "init.kts"
+                this::class.java.classLoader.getResourceAsStream("init.txt")?.toFile(finalInitFile)
+
+                val finalScriptContent = File(finalInitFile).readText(Charsets.UTF_8)
+                val replacedScript = finalScriptContent
+                    .replace("%MODULE_NAME%", name)
+                    .replace("%MODULE_VERSION%", version)
+                    .replace("%MODULE_PACKAGE%", packageName)
+                    .replace("%MODULE_TYPE%", type)
+                    .replace("%HANDLER_NAME%", "executable")
+                    .replace("%SCRIPT_NAME%", "script.kts")
+
+                File(finalInitFile).writeText(replacedScript, Charsets.UTF_8)
 
                 CommandManager.commands["run"]?.execute(args[0], "init.kts") ?: ""
 
@@ -124,7 +125,7 @@ class NewCommand : Command() {
             }
 
             else -> {
-                "\n${ANSI_YELLOW_229} The file must end with [.kts] extension or use: ${ANSIColors.ANSI_WHITE}koupper new module [${ANSI_GREEN_155}nameOfModule${ANSIColors.ANSI_WHITE}]$ANSI_YELLOW_229.$ANSI_RESET\n"
+                "\n${ANSI_YELLOW_229} The file must end with [.kts] extension or use ${ANSIColors.ANSI_WHITE}koupper new module [${ANSI_GREEN_155}nameOfModule${ANSIColors.ANSI_WHITE}]$ANSI_YELLOW_229|| kouppwe new [config-type].$ANSI_RESET\n"
             }
         }
 

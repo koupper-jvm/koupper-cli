@@ -33,7 +33,7 @@ class RunCommand : Command() {
             val executionArgs = args.sliceArray(2 until args.size)
 
             return if (executionArgs.isNotEmpty()) {
-                execute(context = context, args[1], args[2])
+                execute(context = context, args[1], args.drop(2).joinToString(" "))
             } else {
                 execute(context = context, args[1])
             }

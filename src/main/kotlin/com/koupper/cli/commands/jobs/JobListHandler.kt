@@ -21,14 +21,38 @@ class JobListHandler : JobSubcommandHandler {
     private fun generateJobRunnerScript(queue: String, driver: String, jobId: String?): String {
         val jobIdLiteral = jobId?.let { "\"$it\"" } ?: "null"
         return """
-            import com.koupper.octopus.annotations.Export
-            import com.koupper.orchestrator.JobLister
-
-            @Export
-            val setup: (JobLister) -> Unit = { runner ->
-                runner.list(queue = "$queue", driver = "$driver", jobId = $jobIdLiteral)
+        import com.koupper.octopus.annotations.Export
+        import com.koupper.orchestrator.JobLister
+        import com.koupper.orchestrator.JobResult
+    
+        @Export
+        val setup: (JobLister) -> String = { runner ->
+            val results = runner.list(queue = "$queue", driver = "$driver", jobId = $jobIdLiteral)
+            val sb = StringBuilder()
+    
+            results.forEach { res ->
+                when (res) {
+                    is JobResult.Ok -> {
+                        val t = res.task
+                        sb.appendLine("📦 Job ID: ${'$'}{t.id}")
+                        sb.appendLine(" - Function: ${'$'}{t.functionName}")
+                        sb.appendLine(" - Params: ${'$'}{t.params}")
+                        sb.appendLine(" - Source: ${'$'}{t.scriptPath}")
+                        sb.appendLine(" - Context: ${'$'}{t.context}")
+                        sb.appendLine(" - Version: ${'$'}{t.contextVersion}")
+                        sb.appendLine(" - Origin: ${'$'}{t.origin}")
+                        sb.appendLine()
+                    }
+                    is JobResult.Error -> {
+                        sb.appendLine()
+                        sb.appendLine("${'$'}{res.message}")
+                    }
+                }
             }
-        """.trimIndent()
+    
+            sb.toString()
+        }
+    """.trimIndent()
     }
 
     private fun getJobDriverFromConfig(context: String): String? {

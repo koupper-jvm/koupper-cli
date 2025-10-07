@@ -20,14 +20,14 @@ class JobCommand : Command() {
         """
 
         super.description = "\n   Creates and manages background job workers\n"
-        super.arguments = emptyMap()
         super.additionalInformation = """
    For more info: https://koupper.com/cli/commands/job
         """
         super.arguments = mapOf(
             "--force" to "Initializes the job system: generates jobs.json and base Worker class.",
             "--queue=name" to "Specifies the target queue",
-            "--concurrency=N" to "Number of workers to spawn"
+            "--concurrency=N" to "Number of workers to spawn",
+            "--jobId=N" to "Number of workers to spawn"
         )
     }
 
