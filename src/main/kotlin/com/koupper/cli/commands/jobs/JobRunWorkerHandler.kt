@@ -33,24 +33,8 @@ class JobRunWorkerHandler : JobSubcommandHandler {
         
             runner.runPendingJobs(context!!, jobId = $jobIdLiteral, configId = $configIdLiteral) { res ->
                 res.forEach {
-                    when (it) {
-                        is JobResult.Ok -> {
-                            val t = it.task
-                            sb.appendLine("FROM CONFIG ID: ${'$'}{it.configName}")
-                            sb.appendLine("📦 Job ID: ${'$'}{t.id}")
-                            sb.appendLine(" - Function: ${'$'}{t.functionName}")
-                            sb.appendLine(" - Params: ${'$'}{t.params}")
-                            sb.appendLine(" - Source: ${'$'}{t.sourceSnapshot}")
-                            sb.appendLine(" - Context: ${'$'}{t.context}")
-                            sb.appendLine(" - Version: ${'$'}{t.contextVersion}")
-                            sb.appendLine(" - Origin: ${'$'}{t.origin}")
-                            sb.appendLine()
-                        }
-                        is JobResult.Error -> {
-                            sb.appendLine()
-                            sb.appendLine("${'$'}{it.message}")
-                        }
-                    }
+                    sb.appendLine()
+                    sb.appendLine(it)
                 }
             }
             
@@ -58,5 +42,4 @@ class JobRunWorkerHandler : JobSubcommandHandler {
         }
     """.trimIndent()
     }
-
 }
