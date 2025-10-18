@@ -25,6 +25,7 @@ class JobRunWorkerHandler : JobSubcommandHandler {
         import com.koupper.octopus.annotations.Export
         import com.koupper.orchestrator.JobRunner
         import com.koupper.container.context
+        import com.koupper.orchestrator.JobInfo
         import com.koupper.orchestrator.JobResult
         
         @Export
@@ -33,8 +34,21 @@ class JobRunWorkerHandler : JobSubcommandHandler {
         
             runner.runPendingJobs(context!!, jobId = $jobIdLiteral, configId = $configIdLiteral) { res ->
                 res.forEach {
-                    sb.appendLine()
-                    sb.appendLine(it)
+                    when (it) {
+                        is JobInfo -> {
+                            sb.appendLine()
+                            sb.appendLine("From config with id: ${'$'}{it.configId}")
+                            sb.appendLine("📦 Job ID: ${'$'}{it.id}")
+                            sb.appendLine(" - Function: ${'$'}{it.function}")
+                            sb.appendLine(" - Params: ${'$'}{it.params}")
+                            sb.appendLine(" - Result of execution: ${'$'}{it.resultOfExecution}")
+                            sb.appendLine(" - Source: ${'$'}{it.source}")
+                        }
+                        is JobResult.Error -> {
+                            sb.appendLine()
+                            sb.appendLine("${'$'}{it.message}")
+                        }
+                    }
                 }
             }
             

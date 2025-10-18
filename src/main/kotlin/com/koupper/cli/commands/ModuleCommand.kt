@@ -92,7 +92,7 @@ class ModuleCommand : Command() {
 
         val rawCurrent = args.getOrNull(0) ?: "."
         currentLocation = File(rawCurrent).absoluteFile
-        val libDir = File(currentLocation, "lib")
+        val libDir = File(currentLocation, "libs")
 
         val octopusJar = libDir.listFiles { f ->
             f.isFile && f.name.startsWith("octopus-") && f.name.endsWith(".jar")
@@ -334,7 +334,7 @@ class ModuleCommand : Command() {
 
                             result.append(
                                 """
-                           └ ${GREEN}${method ?: "Unknown"}$RESET $endpointPath
+                           └ ${GREEN}${method ?: "Unknown"}$RESET "/$endpointPath"
                                ↳ Function: ${CYAN}$function$RESET
                                ↳ Consumes: ${YELLOW}$consumes$RESET | Produces: ${YELLOW}$produces$RESET
                                ↳ Handler: ${CYAN}$handler$RESET
