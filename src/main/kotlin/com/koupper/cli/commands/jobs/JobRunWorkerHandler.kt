@@ -9,7 +9,7 @@ class JobRunWorkerHandler : JobSubcommandHandler {
         val configId = args.find { it.startsWith("--configId=") }?.substringAfter("=")?.takeIf { it.isNotBlank() }
 
         val scriptPath = "$context/job-runner.kts"
-        File(scriptPath).writeText(generateJobRunnerScript(jobIdArg, configId))
+        File(scriptPath).writeText(generateJobRunnerScript(configId, jobIdArg))
 
         return RunCommand().execute(context, "job-runner.kts")
     }

@@ -3,6 +3,7 @@ package com.koupper.cli.commands.jobs
 import com.koupper.cli.ANSIColors
 import com.koupper.cli.ANSIColors.ANSI_GREEN_155
 import com.koupper.cli.ANSIColors.ANSI_RESET
+import com.koupper.cli.ANSIColors.ANSI_WHITE
 import com.koupper.cli.commands.AvailableCommands.JOB
 import com.koupper.cli.commands.Command
 
@@ -11,12 +12,12 @@ class JobCommand : Command() {
         super.name = JOB
         super.usage = "\n" + """
    koupper job init [--force]                                    Initializes the jobs.json configuration file.
-   koupper job build-worker [--queue=queue][--jobId=queue]       Builds a runnable worker JAR for a queue.
-   koupper job run-worker [--jobId=queue]                        Starts a worker listening to a queue.
-   koupper job list [--jobId=queue]                              Lists available jobs (optionally by queue).
-   koupper job status                                            Shows current job system status.
-   koupper job failed                                            Shows failed jobs.
-   koupper job retry [jobId]                                     Retries a failed job.
+   koupper job build-environment                                 Builds the runnable environment for the worker to execute jobs.
+   koupper job run-worker [--jobId][--configId]                  Runs pending jobs from the configured source.
+   koupper job list [--jobId][--configId]                        Lists pending jobs.
+   koupper job status [--configId]                               Shows current job system status.
+   koupper job failed [--jobId][--configId]                      Shows failed jobs.
+   koupper job retry [--jobId][--configId]                       Retries a failed job.
         """
 
         super.description = "\n   Creates and manages background job workers\n"
@@ -24,10 +25,9 @@ class JobCommand : Command() {
    For more info: https://koupper.com/cli/commands/job
         """
         super.arguments = mapOf(
-            "--force" to "Initializes the job system: generates jobs.json and base Worker class.",
-            "--queue=name" to "Specifies the target queue",
-            "--concurrency=N" to "Number of workers to spawn",
-            "--jobId=N" to "Number of workers to spawn"
+            "--force" to "Forces creation of a new jobs.json configuration file.",
+            "--jobId=jobId" to "Specifies the job ID to used for the operation.",
+            "--configId=configId" to "Specifies the configuration ID to use for the operation.",
         )
     }
 
@@ -38,8 +38,8 @@ class JobCommand : Command() {
 
         var finalArgInfo = ""
 
-        this.arguments.forEach { (commandName, _) ->
-            finalArgInfo += "   $ANSI_GREEN_155$commandName$ANSI_RESET\n"
+        this.arguments.forEach { (commandName, description) ->
+            finalArgInfo += "   $ANSI_GREEN_155$commandName: $ANSI_WHITE$description$ANSI_RESET\n"
         }
 
         return "$argHeader$finalArgInfo"
@@ -47,7 +47,11 @@ class JobCommand : Command() {
 
     override fun execute(vararg args: String): String {
         val validSubcommands = listOf(
-            "init", "build-worker", "run-worker", "list", "status", "failed", "retry"
+            "init", "build-environment", "run-worker", "list", "status", "failed", "retry"
+        )
+
+        val validFlags = listOf(
+            "--force", "--queue", "--concurrency", "--jobId", "--configId"
         )
 
         val context = args.firstOrNull() ?: "."
@@ -63,13 +67,12 @@ class JobCommand : Command() {
             return "\n${ANSIColors.ANSI_RED}Unknown job subcommand: '$subcommand'. Try 'koupper job help'.$ANSI_RESET\n"
         }
 
-        val recognizedFlags = super.arguments.keys
         val usedFlags = realArgs.drop(1).filter { it.startsWith("--") }
 
         val unrecognized = usedFlags.filter { flag ->
-            recognizedFlags.none { valid ->
-                if (valid.contains('=')) {
-                    flag.startsWith(valid.substringBefore("="))
+            validFlags.none { valid ->
+                if (flag.contains('=')) {
+                    flag.substringBefore("=") == valid
                 } else {
                     flag == valid
                 }
@@ -85,7 +88,7 @@ class JobCommand : Command() {
             "init" -> JobInitHandler().handle(context, arrayOf(*args))
             "run-worker" -> JobRunWorkerHandler().handle(context, arrayOf(*args))
             "list" -> JobListHandler().handle(context, arrayOf(*args))
-            "build-worker" -> JobBuildWorkerHandler().handle(context, arrayOf(*args))
+            "build-environment" -> JobBuildWorkerHandler().handle(context, arrayOf(*args))
             "status" -> JobSystemStatusHandler().handle(context, arrayOf(*args))
             /*
             "failed" -> JobFailedHandler().handle(args)
