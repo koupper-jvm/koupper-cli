@@ -5,23 +5,20 @@ import java.io.File
 
 class JobBuildWorkerHandler : JobSubcommandHandler {
     override fun handle(context: String, args: Array<String>): String {
-        val queue = args.getOrNull(1) ?: "default"
-        val driver = getJobDriverFromConfig(context) ?: "file"
-
-        val scriptPath = "$context/build-worker.kts"
-        File(scriptPath).writeText(generateBuildWorkerScript(queue, driver))
-
-        return RunCommand().execute(context, "build-worker.kts")
+        val scriptPath = "$context/worker-builder.kts"
+        File(scriptPath).writeText(generateBuildWorkerScript())
+        return RunCommand().execute(context, "worker-builder.kts")
     }
 
-    private fun generateBuildWorkerScript(queue: String, driver: String): String {
+    private fun generateBuildWorkerScript(): String {
         return """
             import com.koupper.octopus.annotations.Export
             import com.koupper.orchestrator.JobBuilder
+            import com.koupper.container.context
 
             @Export
-            val setup: (JobBuilder) -> Unit = { runner ->
-                runner.buildWorker(queue = "$queue", driver = "$driver")
+            val setup: (JobBuilder) -> String = { runner ->
+                runner.build(context!!)
             }
         """.trimIndent()
     }

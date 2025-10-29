@@ -10,7 +10,7 @@ class JobListHandler : JobSubcommandHandler {
 
         val scriptPath = "$context/job-list.kts"
 
-        File(scriptPath).writeText(generateJobListerScript(jobIdArg, configId))
+        File(scriptPath).writeText(generateJobListerScript(configId, jobIdArg))
 
         return RunCommand().execute(context, "job-list.kts")
     }

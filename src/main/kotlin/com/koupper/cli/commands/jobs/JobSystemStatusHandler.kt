@@ -5,30 +5,36 @@ import java.io.File
 
 class JobSystemStatusHandler : JobSubcommandHandler {
     override fun handle(context: String, args: Array<String>): String {
-        val driver = getJobDriverFromConfig(context) ?: "❓ (no driver found)"
-        val queue = getJobQueueFromConfig(context) ?: "❓ (no queue found)"
+        val configId = args.find { it.startsWith("--configId=") }?.substringAfter("=")?.takeIf { it.isNotBlank() }
 
         val scriptPath = "$context/job-runner.kts"
-        File(scriptPath).writeText(generateJobDisplayerScript(queue, driver))
+        File(scriptPath).writeText(generateJobDisplayerScript(configId))
 
-        val statusHeader = """
-   🧠 Current Job Configuration
-   ─────────────────────────────
-   🛠️  Driver: $driver
-   📦  Queue:  $queue        
-        """
+        val statusHeader = buildString {
+            appendLine()
+            appendLine("   🧠 Current Job Configuration")
+            appendLine("   ─────────────────────────────")
+
+            if (configId.isNullOrBlank()) {
+                appendLine("   🛠️  Using all configurations defined in jobs.json")
+            } else {
+                appendLine("   🛠️  Config ID: $configId")
+            }
+        }
+
 
         return statusHeader + RunCommand().execute(context, "job-runner.kts")
     }
 
-    private fun generateJobDisplayerScript(queue: String, driver: String): String {
+    private fun generateJobDisplayerScript(configId: String?): String {
         return """
             import com.koupper.octopus.annotations.Export
+            import com.koupper.container.context
             import com.koupper.orchestrator.JobDisplayer
 
             @Export
-            val setup: (JobDisplayer) -> Unit = { displayer ->
-                displayer.showStatus(queue = "$queue", driver = "$driver")
+            val setup: (JobDisplayer) -> String = { displayer ->
+                displayer.showStatus(context!!, configId = "$configId")
             }
         """.trimIndent()
     }

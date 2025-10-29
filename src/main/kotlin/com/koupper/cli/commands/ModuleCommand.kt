@@ -43,8 +43,10 @@ class ModuleCommand : Command() {
    koupper $ANSI_GREEN_155$name$ANSI_RESET
     """
         super.description = """
-   ${ANSI_YELLOW_229}Displays folders and files inside the module, including their tags and return types (signatures).
-   If the module is a Gradle project, it also detects HTTP controllers and lists their endpoints and handlers.
+   ${ANSI_YELLOW_229}Displays folders and files inside the module, including their tags.
+   For scripts, it also includes function return types (signatures).
+   If job configurations are present, they are displayed as well.
+   If the module is a Gradle project, it detects HTTP controllers and lists their endpoints and handlers.
 
    ${ANSI_YELLOW_229}Also displays detailed module-level information, such as:${ANSI_RESET}
      - HTTP contract configuration from the YML file
