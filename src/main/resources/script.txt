@@ -1,7 +1,11 @@
-import com.koupper.container.app
+package %PACKAGE%
+
 import com.koupper.octopus.annotations.Export
 
+data class Input(val payload: String?)
+data class Output(val message: String?)
+
 @Export
-val myScript: () -> String = {
-    "Hello world"
+val myScript: (Input) -> Output = { _ ->
+    Output("SUCCESS")
 }

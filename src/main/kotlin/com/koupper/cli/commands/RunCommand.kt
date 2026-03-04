@@ -58,23 +58,65 @@ class RunCommand : Command() {
 
     private fun sendToOctopus(context: String, script: String, params: String): String {
         return try {
-            val socket = Socket("localhost", 9998)
-            val writer = socket.getOutputStream().bufferedWriter()
-            val reader = socket.getInputStream().bufferedReader()
+            Socket("localhost", 9998).use { socket ->
+                val writer = socket.getOutputStream().bufferedWriter()
+                val reader = socket.getInputStream().bufferedReader()
 
+                writer.write("$context $script $params")
+                writer.newLine()
+                writer.flush()
 
-            println("🚀 Enviando comando a octopus: $context $script $params")
-            writer.write("$context $script $params")
-            writer.newLine()
-            writer.flush()
+                val resultBuf = StringBuilder()
+                var inResult = false
 
-            val response = reader.readText()
-            println("📤 Respuesta de octopus: $response")
+                while (true) {
+                    val line = reader.readLine() ?: break
 
-            socket.close()
-            response
+                    when {
+                        line == "RESULT_BEGIN" -> {
+                            inResult = true
+                            resultBuf.clear()
+                        }
+
+                        line == "RESULT_END" -> {
+                            return resultBuf.toString()
+                        }
+
+                        inResult -> {
+                            resultBuf.appendLine(line)
+                        }
+
+                        line.startsWith("PRINT::") -> {
+                            println(line.removePrefix("PRINT::"))
+                        }
+
+                        line.startsWith("PROMPT::") -> {
+                            val parts = line.split("::", limit = 3)
+                            val id = parts.getOrNull(1).orEmpty()
+                            val msg = parts.getOrNull(2).orEmpty()
+
+                            print("$msg ")
+                            val input = readLine().orEmpty()
+
+                            writer.write("PROMPT_RESPONSE::$id::$input")
+                            writer.newLine()
+                            writer.flush()
+                        }
+
+                        line.startsWith("ERROR::") -> {
+                            return line.removePrefix("ERROR::")
+                        }
+
+                        else -> {
+                            // fallback viejo: imprime normal
+                            println("📤 Respuesta de octopus: $line")
+                        }
+                    }
+                }
+
+                "Error: connection closed"
+            }
         } catch (e: Exception) {
-            println("⚠️ Error al enviar comando a octopus: ${e.message}")
             "Error: ${e.message}"
         }
     }

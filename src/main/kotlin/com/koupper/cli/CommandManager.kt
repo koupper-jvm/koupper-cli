@@ -20,12 +20,11 @@ import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 private val userPath = System.getProperty("user.home")
-private val commandFile = File("$userPath/.koupper/helpers/koupper-commands.txt")
 
 private fun checkForUpdatesFrom(baseDate: String) {
     try {
         val process = Runtime.getRuntime()
-                .exec("$userPath/.koupper/helpers/octopusBootstrapper.sh UPDATING_CHECK")
+            .exec("$userPath/.koupper/helpers/octopusBootstrapper.sh UPDATING_CHECK")
 
         process.waitFor()
 
@@ -43,13 +42,12 @@ private fun checkForUpdatesFrom(baseDate: String) {
         val output = process.inputStream.bufferedReader().readText()
         val readyForUpdate = output == "AVAILABLE_UPDATES"
 
-        version.printWriter().use { out -> out.println("{\"last_request\": $baseDate, \"ready_for_update\": $readyForUpdate") }
+        version.printWriter()
+            .use { out -> out.println("{\"last_request\": $baseDate, \"ready_for_update\": $readyForUpdate") }
     } catch (exception: IOException) {
         println("\n$ANSI_RED${exception.printStackTrace()}\n")
     }
 }
-
-
 class CommandManager {
     companion object {
         val commands: Map<String, Command> = mapOf(
@@ -92,12 +90,15 @@ class CommandManager {
                 file.setExecutable(true)
                 file.setReadable(true)
                 file.setWritable(true)
-                updateInfo.printWriter().use { out -> out.println("{\"last_request\": ${Date().time}, \"ready_for_update\": false}") }
+                updateInfo.printWriter()
+                    .use { out -> out.println("{\"last_request\": ${Date().time}, \"ready_for_update\": false}") }
             }
+
             else -> {
                 val lastRequest = Date(baseDate.toLong() - (3600 * 3) * 1000).time
 
-                updateInfo.printWriter().use { out -> out.println("{\"last_request\": $lastRequest, \"ready_for_update\": true}") }
+                updateInfo.printWriter()
+                    .use { out -> out.println("{\"last_request\": $lastRequest, \"ready_for_update\": true}") }
             }
         }
     }
@@ -115,16 +116,32 @@ class CommandManager {
     }
 }
 
-fun main() = runBlocking {
+fun main(args: Array<String>) = runBlocking {
+    val commandManager = CommandManager()
+
+    // ✅ MODO DIRECTO: si el jar se ejecuta con argumentos, procesa y termina
+    if (args.isNotEmpty()) {
+        val context = System.getProperty("user.dir")
+        val input = arrayOf(context, *args)
+
+        val response = if (input.size == 1) {
+            DefaultCommand().execute()
+        } else {
+            commandManager.process(input)
+        }
+
+        print(response)
+        return@runBlocking
+    }
+
+    // ✅ MODO SERVER (como lo tienes hoy)
     val scope = CoroutineScope(Dispatchers.Default)
 
     scope.launch {
-        val commandManager = CommandManager()
         val versionFile = File("$userPath/.koupper/helpers/.update_info")
 
         if (versionFile.exists()) {
             val updateInfo = versionFile.readLines().firstOrNull() ?: ""
-
             val date = "\\D".toRegex().split(updateInfo).firstOrNull { it.isNotEmpty() } ?: "0"
 
             val timeElapsedSinceLastRequest = Date().time - Date(date.toLong()).time
@@ -144,9 +161,7 @@ fun main() = runBlocking {
         startSocketServer(commandManager, this)
     }
 
-    while (true) {
-        delay(1000)
-    }
+    while (true) delay(1000)
 }
 
 fun startSocketServer(commandManager: CommandManager, scope: CoroutineScope) {

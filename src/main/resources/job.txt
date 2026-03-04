@@ -1,14 +1,10 @@
-import com.koupper.container.app
+package %PACKAGE%
+
 import com.koupper.octopus.annotations.Export
-import com.koupper.octopus.process.ModuleProcessor
+
+data class Input(val payload: String?)
 
 @Export
-val setup: (RegisteredJobHelper) -> String = { helper ->
-    helper.register(
-        exportName = "registerIglyUser",
-        scriptPath = pathToThisScript,
-        context = currentContext
-    )
-
-    "SUCCESS"
+val myScript: (Input) -> Unit = { input ->
+    print(input.payload)
 }
