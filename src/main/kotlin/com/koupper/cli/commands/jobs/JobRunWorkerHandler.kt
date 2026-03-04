@@ -22,38 +22,59 @@ class JobRunWorkerHandler : JobSubcommandHandler {
         val configIdLiteral = configId?.let { "\"$it\"" } ?: "null"
 
         return """
-        import com.koupper.octopus.annotations.Export
-        import com.koupper.orchestrator.JobRunner
-        import com.koupper.container.context
-        import com.koupper.orchestrator.JobInfo
-        import com.koupper.orchestrator.JobResult
-        
-        @Export
-        val setup: (JobRunner) -> String = { runner ->
-            val sb = StringBuilder()
-        
-            runner.runPendingJobs(context!!, jobId = $jobIdLiteral, configId = $configIdLiteral) { res ->
-                res.forEach {
-                    when (it) {
-                        is JobInfo -> {
-                            sb.appendLine()
-                            sb.appendLine("From config with id: ${'$'}{it.configId}")
-                            sb.appendLine("📦 Job ID: ${'$'}{it.id}")
-                            sb.appendLine(" - Function: ${'$'}{it.function}")
-                            sb.appendLine(" - Params: ${'$'}{it.params}")
-                            sb.appendLine(" - Result of execution: ${'$'}{it.resultOfExecution}")
-                            sb.appendLine(" - Source: ${'$'}{it.source}")
-                        }
-                        is JobResult.Error -> {
-                            sb.appendLine()
-                            sb.appendLine("${'$'}{it.message}")
-                        }
-                    }
+import com.koupper.container.app
+import com.koupper.container.context
+import com.koupper.octopus.ScriptExecutor
+import com.koupper.octopus.annotations.Export
+import com.koupper.orchestrator.JobInfo
+import com.koupper.orchestrator.JobResult
+import com.koupper.orchestrator.JobRunner
+import java.util.concurrent.CompletableFuture
+
+@Export
+val setup: (JobRunner) -> String = { runner ->
+    val sb = StringBuilder()
+
+    runner.runPendingJobs(
+        runScriptContent = { ctx, scriptPath, argsString: String ->
+            val se = app.getInstance(ScriptExecutor::class)
+            val future = CompletableFuture<Any?>()
+
+            se.runFromScriptFile<Any?>(
+                ctx,
+                scriptPath,
+                argsString
+            ) { value: Any? ->
+                future.complete(value)
+            }
+
+            future.get()
+        },
+        context!!,
+        jobId = $jobIdLiteral,
+        configId = $configIdLiteral
+    ) { res ->
+        res.forEach {
+            when (it) {
+                is JobInfo -> {
+                    sb.appendLine()
+                    sb.appendLine("From config with id: ${'$'}{it.configId}")
+                    sb.appendLine("📦 Job ID: ${'$'}{it.id}")
+                    sb.appendLine(" - Function: ${'$'}{it.function}")
+                    sb.appendLine(" - Params: ${'$'}{it.params}")
+                    sb.appendLine(" - Result of execution: ${'$'}{it.resultOfExecution}")
+                    sb.appendLine(" - Source: ${'$'}{it.source}")
+                }
+                is JobResult.Error -> {
+                    sb.appendLine()
+                    sb.appendLine("${'$'}{it.message}")
                 }
             }
-            
-            sb.toString()
         }
-    """.trimIndent()
+    }
+
+    sb.toString()
+}
+""".trimIndent()
     }
 }

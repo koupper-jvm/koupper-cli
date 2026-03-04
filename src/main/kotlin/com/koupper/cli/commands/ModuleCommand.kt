@@ -143,10 +143,35 @@ class ModuleCommand : Command() {
 
     private fun buildModuleAnalysisResult(): String {
         val result = StringBuilder()
-        val jsonFile = File(System.getProperty("user.home"), ".koupper/helpers/module-analysis.json")
-        if (!jsonFile.exists()) return ""
 
-        val jsonData = jacksonObjectMapper().readValue(jsonFile.inputStream(), object : TypeReference<Map<String, Any>>() {})
+        val home = System.getProperty("user.home")
+        val moduleJson = File(home, ".koupper/helpers/module-analysis.json")
+        if (!moduleJson.exists()) return ""
+
+        val mapper = jacksonObjectMapper()
+        val raw: Any = mapper.readValue(moduleJson.inputStream(), object : TypeReference<Any>() {})
+
+        val jsonData: Map<String, Any?> = when (raw) {
+            is Map<*, *> -> raw.entries.associate { (k, v) -> k.toString() to v }
+            is List<*> -> {
+                val first = raw.firstOrNull()
+                if (first is Map<*, *>) first.entries.associate { (k, v) -> k.toString() to v }
+                else emptyMap()
+            }
+            else -> emptyMap()
+        }
+
+        if (jsonData.isEmpty()) {
+            moduleJson.delete()
+            return ""
+        }
+
+        val moreInfo = jsonData["more_info"]?.toString()?.trim().orEmpty()
+        if (moreInfo.isNotBlank()) {
+            result.append(moreInfo)
+            if (!moreInfo.endsWith("\n")) result.append("\n")
+            result.append("\n")
+        }
 
         val folders = jsonData["folders"] as? List<Map<String, Any?>> ?: emptyList()
         val files = jsonData["files"] as? List<Map<String, Any?>> ?: emptyList()
@@ -157,22 +182,23 @@ class ModuleCommand : Command() {
         val maxNameLength = allNames.maxOfOrNull { it.length } ?: 0
 
         for (folder in folders) {
-            val folderName = folder["folder"] as String
+            val folderName = folder["folder"] as? String ?: ""
             val tags = (folder["tags"] as? List<String>)?.map(::colorizeTag) ?: emptyList()
             val padded = folderName.padEnd(maxNameLength + 2)
             result.append("$padded${tags.joinToString(" ")}\n")
         }
 
         for (file in files) {
-            val fileName = file["file"] as String
+            val fileName = file["file"] as? String ?: ""
             val tags = (file["tags"] as? List<String>)?.map(::colorizeTag) ?: emptyList()
-            val signature = file["signature"]?.toString() ?: ""
+            val signature = file["signature"]?.toString().orEmpty()
             val padded = fileName.padEnd(maxNameLength + 2)
-            result.append("$padded${tags.joinToString(" ")} $signature\n")
+            result.append("$padded${tags.joinToString(" ")}")
+            if (signature.isNotBlank()) result.append(" $signature")
+            result.append("\n")
         }
 
-        jsonFile.delete()
-
+        moduleJson.delete()
         return result.toString()
     }
 
@@ -298,61 +324,87 @@ class ModuleCommand : Command() {
         val CYAN = "\u001B[36m"
         val YELLOW = "\u001B[33m"
         val RESET = "\u001B[0m"
+        val DIM = "\u001B[2m"
 
-        val file = File(
-            System.getProperty("user.home"),
-            ".koupper/helpers/controllers.json"
-        )
-
-        if (!file.exists()) {
-            return "⚠️  No controllers found\n"
-        }
+        val file = File(System.getProperty("user.home"), ".koupper/helpers/controllers.json")
+        if (!file.exists()) return "⚠️  No controllers found\n"
 
         try {
-            val objectMapper = jacksonObjectMapper()
-            val controllers = objectMapper.readValue<List<Map<String, Any?>>>(file)
+            val mapper = jacksonObjectMapper()
+            val raw: Any = mapper.readValue(file, object : com.fasterxml.jackson.core.type.TypeReference<Any>() {})
 
-            result.append("\n ⚙️ Controllers found:\n\n")
-            controllers.forEach { entry ->
+            val data: Map<String, Any?> = when (raw) {
+                is Map<*, *> -> raw.entries.associate { it.key.toString() to it.value }
+                is List<*> -> mapOf("controllers" to raw)
+                else -> emptyMap()
+            }
+
+            val moreInfo = data["more_info"]?.toString()?.trim().orEmpty()
+            if (moreInfo.isNotBlank()) {
+                result.append(moreInfo)
+                if (!moreInfo.endsWith("\n")) result.append("\n")
+                result.append("\n")
+            }
+
+            val controllers = data["controllers"] as? List<Map<String, Any?>> ?: emptyList()
+            if (controllers.isEmpty()) return result.toString()
+
+            result.append(" ⚙️ Controllers found:\n\n")
+
+            val allEndpoints = controllers.flatMap { it["endpoints"] as? List<Map<String, Any?>> ?: emptyList() }
+            val maxMethod = (allEndpoints.maxOfOrNull { (it["method"]?.toString() ?: "Unknown").length } ?: 6).coerceAtLeast(6)
+            val maxHandler = (allEndpoints.maxOfOrNull { (it["handler"]?.toString() ?: "Unknown").length } ?: 7).coerceAtLeast(7)
+
+            controllers.forEachIndexed { idx, entry ->
                 val port = entry["port"] ?: "Unknown"
-                val controllerList = entry["controllers"] as? List<Map<String, Any?>> ?: emptyList()
+                val name = entry["controller"] as? String ?: "Unknown"
+                val basePath = entry["path"] ?: "/"
+                val endpoints = entry["endpoints"] as? List<Map<String, Any?>> ?: emptyList()
 
-                controllerList.forEach { controller ->
-                    val name = controller["controller"] as? String ?: "Unknown"
-                    val path = controller["path"] ?: "/"
-                    val endpoints = controller["endpoints"] as? List<Map<String, Any?>> ?: emptyList()
+                if (idx > 0) {
+                    result.append("${DIM}────────────────────────────────────────────────────────────${RESET}\n\n")
+                }
 
-                    result.append("🔹 Controller: ${CYAN}$name$RESET (port ${YELLOW}$port$RESET, base path: ${YELLOW}$path$RESET)\n\n")
-                    if (endpoints.isEmpty()) {
-                        result.append("   └ No endpoints found.\n")
-                    } else {
-                        endpoints.forEach { endpoint ->
-                            val method = endpoint["method"]
-                            val endpointPath = endpoint["methodPath"]
-                            val consumes = endpoint["consumes"]
-                            val produces = endpoint["produces"]
-                            val function = endpoint["function"]
-                            val handler = endpoint["handler"]
+                result.append("🔹 Controller: ${CYAN}$name$RESET (port ${YELLOW}$port$RESET, base path: ${YELLOW}$basePath$RESET)\n\n")
 
+                if (endpoints.isEmpty()) {
+                    result.append("   └ No endpoints found.\n\n")
+                } else {
+                    endpoints.forEach { endpoint ->
+                        val method = (endpoint["method"]?.toString() ?: "Unknown")
+                        val endpointPath = (endpoint["path"]?.toString() ?: "Unknown")
+                        val consumes = (endpoint["consumes"]?.toString() ?: "None")
+                        val produces = (endpoint["produces"]?.toString() ?: "None")
+                        val function = (endpoint["function"]?.toString() ?: "Unknown")
+                        val handler = (endpoint["handler"]?.toString() ?: "Unknown")
+
+                        val methodPad = method.padEnd(maxMethod)
+                        val handlerPad = handler.padEnd(maxHandler)
+
+                        result.append(
+                            """
+   └ ${GREEN}${methodPad}$RESET ${YELLOW}${endpointPath}$RESET  ${DIM}handler:${RESET} ${CYAN}${handlerPad}$RESET
+       ↳ fn: ${CYAN}${function}$RESET
+                        """.trimIndent()
+                        )
+
+                        if (consumes != "None" || produces != "None") {
                             result.append(
                                 """
-                           └ ${GREEN}${method ?: "Unknown"}$RESET "/$endpointPath"
-                               ↳ Function: ${CYAN}$function$RESET
-                               ↳ Consumes: ${YELLOW}$consumes$RESET | Produces: ${YELLOW}$produces$RESET
-                               ↳ Handler: ${CYAN}$handler$RESET
-
+                            
+       ↳ io: ${YELLOW}${consumes}$RESET → ${YELLOW}${produces}$RESET
                             """.trimIndent()
-                            ).append("\n")
+                            )
                         }
+
+                        result.append("\n\n")
                     }
                 }
             }
 
-            return result.toString()
+            return result.toString().trimEnd() + "\n"
         } finally {
-            if (file.exists()) {
-                file.delete()
-            }
+            if (file.exists()) file.delete()
         }
     }
 }

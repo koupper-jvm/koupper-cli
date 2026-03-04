@@ -4,11 +4,13 @@ import com.koupper.octopus.process.ModuleProcessor
 
 @Export
 val setup: (ModuleProcessor) -> String = { processor ->
-    processor.name("%MODULE_NAME%")
-        .version("%MODULE_VERSION%")
-        .packageName("%MODULE_PACKAGE%")
-        .template("%MODULE_TEMPLATE%")
-        .artifactType("%MODULE_TYPE%")
+    processor.name("deleteme-service")
+        .version("1.0.0")
+        .packageName("com.example")
+        .template("DEFAULT")
+        .scripts(mapOf(
+            "main" to "script.kts",
+        ))
         .run()
 
     "SUCCESS"
