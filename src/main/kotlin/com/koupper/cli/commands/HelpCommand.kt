@@ -62,6 +62,6 @@ class HelpCommand : Command() {
             finalArgInfo += "   $ANSI_GREEN_155$commandName$ANSI_RESET \n"
         }
 
-        return "$argHeader$finalArgInfo"
+        return "$argHeader$finalArgInfo\n"
     }
 }

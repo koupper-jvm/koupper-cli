@@ -119,49 +119,16 @@ class CommandManager {
 fun main(args: Array<String>) = runBlocking {
     val commandManager = CommandManager()
 
-    // ✅ MODO DIRECTO: si el jar se ejecuta con argumentos, procesa y termina
-    if (args.isNotEmpty()) {
-        val context = System.getProperty("user.dir")
-        val input = arrayOf(context, *args)
+    val context = System.getProperty("user.dir")
+    val input = arrayOf(context, *args)
 
-        val response = if (input.size == 1) {
-            DefaultCommand().execute()
-        } else {
-            commandManager.process(input)
-        }
-
-        print(response)
-        return@runBlocking
+    val response = if (input.size == 1) {
+        DefaultCommand().execute()
+    } else {
+        commandManager.process(input)
     }
 
-    // ✅ MODO SERVER (como lo tienes hoy)
-    val scope = CoroutineScope(Dispatchers.Default)
-
-    scope.launch {
-        val versionFile = File("$userPath/.koupper/helpers/.update_info")
-
-        if (versionFile.exists()) {
-            val updateInfo = versionFile.readLines().firstOrNull() ?: ""
-            val date = "\\D".toRegex().split(updateInfo).firstOrNull { it.isNotEmpty() } ?: "0"
-
-            val timeElapsedSinceLastRequest = Date().time - Date(date.toLong()).time
-            val hoursElapsedSinceLastRequest = TimeUnit.MILLISECONDS.toHours(timeElapsedSinceLastRequest)
-
-            if (hoursElapsedSinceLastRequest >= 24) {
-                if ("true|false".toRegex().find(updateInfo)?.value?.toBoolean() == true) {
-                    if (hoursElapsedSinceLastRequest.rem(4) == 0L) {
-                        commandManager.notifyAboutUpdate(date)
-                    }
-                } else {
-                    launch { checkForUpdatesFrom(date) }
-                }
-            }
-        }
-
-        startSocketServer(commandManager, this)
-    }
-
-    while (true) delay(1000)
+    print(response)
 }
 
 fun startSocketServer(commandManager: CommandManager, scope: CoroutineScope) {

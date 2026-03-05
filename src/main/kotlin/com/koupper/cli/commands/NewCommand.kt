@@ -28,7 +28,7 @@ class NewCommand : Command() {
     override fun execute(vararg args: String): String {
         var result = when {
             args.size < 2 -> {
-                this.showNewInfo()
+                return this.showNewInfo()
             }
 
             args[1].trim().equals("module", ignoreCase = true) -> {

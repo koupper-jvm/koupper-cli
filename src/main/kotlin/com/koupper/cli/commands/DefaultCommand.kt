@@ -29,6 +29,6 @@ class DefaultCommand : Command() {
 
         val arguments = super.showArguments()
 
-        return "$description$usage$additionalInformation$arguments"
+        return "$description$usage$additionalInformation$arguments\n"
     }
 }
