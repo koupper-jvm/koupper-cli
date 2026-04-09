@@ -49,8 +49,15 @@ class RunCommand : Command() {
     }
 
     private fun execute(context: String, filePath: String, params: String = "EMPTY_PARAMS"): String {
-        if (!File(context + File.separator + filePath).exists()) {
-            return "\n${ANSI_YELLOW_229} The script ${File(filePath).name} does not exist.${ANSI_RESET}\n"
+
+        val file = if (File(filePath).isAbsolute) {
+            File(filePath)
+        } else {
+            File(context + File.separator + filePath)
+        }
+
+        if (!file.exists()) {
+            return "\n${ANSI_YELLOW_229} The script ${file.name} does not exist.${ANSI_RESET}\n"
         }
 
         return sendToOctopus(context, filePath, params)
@@ -105,11 +112,6 @@ class RunCommand : Command() {
 
                         line.startsWith("ERROR::") -> {
                             return line.removePrefix("ERROR::")
-                        }
-
-                        else -> {
-                            // fallback viejo: imprime normal
-                            println("📤 Respuesta de octopus: $line")
                         }
                     }
                 }
