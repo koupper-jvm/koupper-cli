@@ -5,7 +5,11 @@ import com.koupper.cli.commands.*
 import com.koupper.cli.commands.AvailableCommands.HELP
 import com.koupper.cli.commands.AvailableCommands.MODULE
 import com.koupper.cli.commands.AvailableCommands.NEW
+import com.koupper.cli.commands.AvailableCommands.PROVIDER
+import com.koupper.cli.commands.AvailableCommands.RECONCILE
 import com.koupper.cli.commands.AvailableCommands.RUN
+import com.koupper.cli.commands.AvailableCommands.DEPLOY
+import com.koupper.cli.commands.AvailableCommands.INFRA
 import com.koupper.cli.commands.AvailableCommands.JOB
 import com.koupper.cli.commands.jobs.JobCommand
 import kotlinx.coroutines.delay
@@ -54,8 +58,12 @@ class CommandManager {
             HELP to HelpCommand(),
             NEW to NewCommand(),
             RUN to RunCommand(),
+            DEPLOY to DeployCommand(),
             MODULE to ModuleCommand(),
-            JOB to JobCommand()
+            JOB to JobCommand(),
+            PROVIDER to ProviderCommand(),
+            INFRA to InfraCommand(),
+            RECONCILE to ReconcileCommand()
         )
     }
 
@@ -116,19 +124,36 @@ class CommandManager {
     }
 }
 
-fun main(args: Array<String>) = runBlocking {
-    val commandManager = CommandManager()
+fun main(args: Array<String>) {
+    runBlocking {
+        val commandManager = CommandManager()
 
-    val context = System.getProperty("user.dir")
-    val input = arrayOf(context, *args)
+        val context = System.getProperty("user.dir")
+        val input = arrayOf(context, *args)
 
-    val response = if (input.size == 1) {
-        DefaultCommand().execute()
-    } else {
-        commandManager.process(input)
+        val response = if (input.size == 1) {
+            DefaultCommand().execute()
+        } else {
+            commandManager.process(input)
+        }
+
+        val addPromptSpacer = input.getOrNull(1) == RUN
+
+        print(response)
+        print(ANSIColors.ANSI_RESET)
+        if (!response.endsWith("\n")) {
+            println()
+        }
+
+        if (addPromptSpacer) {
+            println()
+        }
+
+        System.out.flush()
+        System.err.flush()
+
+        kotlin.system.exitProcess(0)
     }
-
-    print(response)
 }
 
 fun startSocketServer(commandManager: CommandManager, scope: CoroutineScope) {
