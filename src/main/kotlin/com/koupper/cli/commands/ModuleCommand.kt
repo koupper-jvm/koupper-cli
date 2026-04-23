@@ -136,18 +136,23 @@ class ModuleCommand : Command() {
             "⚠️ Octopus dependency not found in ${libDir.absolutePath}\n"
         }
 
-        val koupperHelpersDirectory = System.getProperty("user.home") + File.separator +
-                ".koupper" + File.separator + "helpers" + File.separator
-        val finalScript = "${koupperHelpersDirectory}list.kts"
+        val koupperHelpersDirectory = File(System.getProperty("user.home"), ".koupper/helpers")
+        if (!koupperHelpersDirectory.exists() && !koupperHelpersDirectory.mkdirs()) {
+            return "$ANSI_YELLOW_229 Could not create helpers directory: ${koupperHelpersDirectory.absolutePath} $ANSI_RESET"
+        }
 
-        this::class.java.classLoader.getResourceAsStream("list.txt")?.toFile(finalScript)
-        val finalScriptContent = File(finalScript).readText(Charsets.UTF_8)
+        val finalScript = File(koupperHelpersDirectory, "list.kts")
+        val listScriptResource = this::class.java.classLoader.getResourceAsStream("list.txt")
+            ?: return "$ANSI_YELLOW_229 Missing helper resource: list.txt $ANSI_RESET"
+        listScriptResource.use { it.toFile(finalScript) }
+
+        val finalScriptContent = finalScript.readText(Charsets.UTF_8)
 
         val escapedPath = targetDir.path.replace("\\", "\\\\")
         val replacedScript = finalScriptContent.replace("%TARGET%", escapedPath)
-        File(finalScript).writeText(replacedScript, Charsets.UTF_8)
+        finalScript.writeText(replacedScript, Charsets.UTF_8)
 
-        CommandManager.commands["run"]?.execute(koupperHelpersDirectory, "list.kts") ?: ""
+        CommandManager.commands["run"]?.execute(koupperHelpersDirectory.absolutePath, "list.kts") ?: ""
 
         results += buildModuleAnalysisResult()
 
@@ -413,8 +418,9 @@ class ModuleCommand : Command() {
             token
         }
 
-    private fun InputStream.toFile(path: String) {
-        File(path).outputStream().use { this.copyTo(it) }
+    private fun InputStream.toFile(file: File) {
+        file.parentFile?.mkdirs()
+        file.outputStream().use { this.copyTo(it) }
     }
 
     private fun describeHttpConfig(): String {
