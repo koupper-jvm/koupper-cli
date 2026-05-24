@@ -1,6 +1,6 @@
 package %PACKAGE%
 
-import com.koupper.octopus.annotations.Export
+import com.koupper.shared.annotations.Export
 
 data class InputScript2(val message: String?, val statusCode: Int)
 

@@ -21,7 +21,7 @@ class JobListHandler : JobSubcommandHandler {
         val configIdLiteral = configId?.let { "\"$it\"" } ?: "null"
 
         return """
-        import com.koupper.octopus.annotations.Export
+        import com.koupper.shared.annotations.Export
         import com.koupper.orchestrator.JobLister
         import com.koupper.orchestrator.JobResult
         import com.koupper.container.context

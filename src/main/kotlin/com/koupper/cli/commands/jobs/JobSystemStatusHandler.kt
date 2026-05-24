@@ -27,7 +27,7 @@ class JobSystemStatusHandler : JobSubcommandHandler {
 
     private fun generateJobDisplayerScript(configId: String?): String {
         return """
-            import com.koupper.octopus.annotations.Export
+            import com.koupper.shared.annotations.Export
             import com.koupper.container.context
             import com.koupper.orchestrator.JobDisplayer
 

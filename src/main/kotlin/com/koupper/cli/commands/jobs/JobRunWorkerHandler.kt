@@ -26,7 +26,7 @@ class JobRunWorkerHandler : JobSubcommandHandler {
 import com.koupper.container.app
 import com.koupper.container.context
 import com.koupper.octopus.ScriptExecutor
-import com.koupper.octopus.annotations.Export
+import com.koupper.shared.annotations.Export
 import com.koupper.orchestrator.JobInfo
 import com.koupper.orchestrator.JobResult
 import com.koupper.orchestrator.JobRunner
