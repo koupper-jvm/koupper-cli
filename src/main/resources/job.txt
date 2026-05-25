@@ -1,6 +1,6 @@
 package %PACKAGE%
 
-import com.koupper.octopus.annotations.Export
+import com.koupper.shared.annotations.Export
 
 data class Input(val payload: String?)
 
@@ -8,3 +8,4 @@ data class Input(val payload: String?)
 val myScript: (Input) -> Unit = { input ->
     print(input.payload)
 }
+

@@ -1,6 +1,6 @@
 package %PACKAGE%
 
-import com.koupper.octopus.annotations.Export
+import com.koupper.shared.annotations.Export
 
 data class InputScript2(val message: String?, val statusCode: Int)
 
@@ -8,3 +8,4 @@ data class InputScript2(val message: String?, val statusCode: Int)
 val script1: () -> InputScript2 = {
     InputScript2("SUCCESS", 200)
 }
+

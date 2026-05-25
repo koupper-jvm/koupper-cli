@@ -13,7 +13,7 @@ class JobBuildWorkerHandler : JobSubcommandHandler {
 
     private fun generateBuildWorkerScript(): String {
         return """
-            import com.koupper.octopus.annotations.Export
+            import com.koupper.shared.annotations.Export
             import com.koupper.orchestrator.JobBuilder
             import com.koupper.container.context
 
