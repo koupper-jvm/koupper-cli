@@ -15,6 +15,7 @@ object AvailableCommands {
     const val PROVIDER = "provider"
     const val INFRA = "infra"
     const val RECONCILE = "reconcile"
+    const val MONITOR = "monitor"
 
     fun commands(): Map<String, String> = mapOf(
         NEW to "Creates a module or script",
@@ -25,6 +26,7 @@ object AvailableCommands {
         JOB to "Creates and manages background job workers",
         PROVIDER to "Lists available service providers and environment requirements",
         INFRA to "Runs Terraform-based infrastructure lifecycle commands",
-        RECONCILE to "Orchestrates infra/preflight/deploy/smoke/rollback pipelines"
+        RECONCILE to "Orchestrates infra/preflight/deploy/smoke/rollback pipelines",
+        MONITOR to "Launches the IGLY CORTEX real-time swarm dashboard"
     )
 }

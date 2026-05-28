@@ -4,6 +4,7 @@ import com.koupper.cli.ANSIColors.ANSI_RED
 import com.koupper.cli.commands.*
 import com.koupper.cli.commands.AvailableCommands.HELP
 import com.koupper.cli.commands.AvailableCommands.MODULE
+import com.koupper.cli.commands.AvailableCommands.MONITOR
 import com.koupper.cli.commands.AvailableCommands.NEW
 import com.koupper.cli.commands.AvailableCommands.PROVIDER
 import com.koupper.cli.commands.AvailableCommands.RECONCILE
@@ -63,7 +64,8 @@ class CommandManager {
             JOB to JobCommand(),
             PROVIDER to ProviderCommand(),
             INFRA to InfraCommand(),
-            RECONCILE to ReconcileCommand()
+            RECONCILE to ReconcileCommand(),
+            MONITOR to MonitorCommand()
         )
     }
 
