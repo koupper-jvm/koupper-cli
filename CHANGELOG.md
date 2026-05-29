@@ -8,7 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `koupper worker [jobsDir] [--queues=q1,q2] [--concurrency=N] [--interval=ms]` — job worker daemon. Polls `~/.koupper/jobs/` queue directories, claims jobs atomically via POSIX `renameTo`, executes agent `.kts` scripts via `koupper run`, and streams output to `logs/<queue>/<jobId>.log`. Completes the file-based swarm execution cycle.
+- `koupper worker [jobsDir] [--queues=q1,q2] [--concurrency=N] [--interval=ms] [--timeout=seconds] [--max-retries=N] [--enable-scheduling]` — job worker daemon. Polls `~/.koupper/jobs/` queue directories, claims jobs atomically via POSIX `renameTo`, executes agent `.kts` scripts via `koupper run`, and streams output to `logs/<queue>/<jobId>.log`.
+  - `--timeout=<seconds>` (default 300, env `KOUPPER_WORKER_TIMEOUT`) — kills the subprocess if it runs longer than N seconds and moves the job to `.failed/`.
+  - `--max-retries=<N>` (default 3) — after N failures on the same job, moves it to `.dead/` instead of `.failed/` to prevent infinite retry loops.
+  - `--enable-scheduling` — activates the built-in scheduler engine that reads `~/.koupper/schedules.json` and enqueues jobs when their cron/rate/once trigger fires.
+- `koupper schedule <subcommand>` — manage agent schedules stored in `~/.koupper/schedules.json`.
+  - `add <agentFile> --cron="0 8 * * 1-5" [--id=<id>] [--queue=<queue>]` — schedule by cron expression (5-field: min hour day month weekday).
+  - `add <agentFile> --rate=<ms> [--id=<id>]` — schedule by fixed interval in milliseconds.
+  - `add <agentFile> --once="<ISO8601>" [--id=<id>]` — schedule a single one-time run.
+  - `list` — display all schedules with id, trigger, agent, queue, and enabled state.
+  - `remove <id>` — delete a schedule entry.
+  - `enable <id>` / `disable <id>` — toggle a schedule without deleting it.
 
 ---
 
