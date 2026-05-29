@@ -267,15 +267,16 @@ class WorkerCommand : Command() {
                 println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ⏱ $jobId timed out (${timeoutSec}s) — killed")
                 release()
             }
-            proc.exitValue() == 0 -> {
+            proc.exitValue() == 0 && !logContainsScriptError(logFile) -> {
                 logFile.appendText("[DONE] ${elapsed}ms\n")
                 println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} ✓ $jobId  (${elapsed}ms)")
                 ack()
             }
             else -> {
                 val exit = proc.exitValue()
-                logFile.appendText("[FAILED] exit=$exit  ${elapsed}ms\n")
-                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ✗ $jobId  exit=$exit  (${elapsed}ms)")
+                val reason = if (logContainsScriptError(logFile)) "script error" else "exit=$exit"
+                logFile.appendText("[FAILED] $reason  ${elapsed}ms\n")
+                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ✗ $jobId  $reason  (${elapsed}ms)")
                 release()
             }
         }
@@ -296,6 +297,19 @@ class WorkerCommand : Command() {
         File("$home/.koupper/$scriptPath").takeIf { it.exists() }?.let { return it }
         File("$home/.koupper/agents", File(scriptPath).name).takeIf { it.exists() }?.let { return it }
         return null
+    }
+
+    private fun logContainsScriptError(logFile: File): Boolean {
+        if (!logFile.exists()) return false
+        return logFile.useLines { lines ->
+            lines.any { line ->
+                "No function annotated with @Export was found" in line ||
+                "Script error:" in line ||
+                "<ERROR::>" in line ||
+                "error: unresolved reference" in line ||
+                "Exception in thread \"main\"" in line
+            }
+        }
     }
 
     private fun extractField(json: String, field: String): String? =
