@@ -18,6 +18,7 @@ object AvailableCommands {
     const val START    = "start"
     const val MONITOR  = "monitor"
     const val WORKER   = "worker"
+    const val SCHEDULE = "schedule"
 
     fun commands(): Map<String, String> = mapOf(
         NEW to "Creates a module or script",
@@ -29,8 +30,9 @@ object AvailableCommands {
         PROVIDER to "Lists available service providers and environment requirements",
         INFRA to "Runs Terraform-based infrastructure lifecycle commands",
         RECONCILE to "Orchestrates infra/preflight/deploy/smoke/rollback pipelines",
-        START   to "Start the full CORTEX stack: worker + web UI + monitor in one command",
-        MONITOR to "Launches the IGLY CORTEX real-time swarm dashboard",
-        WORKER  to "Starts a job worker daemon that executes agent scripts from the queue"
+        START    to "Start the full CORTEX stack: worker + web UI + monitor in one command",
+        MONITOR  to "Launches the IGLY CORTEX real-time swarm dashboard",
+        WORKER   to "Starts a job worker daemon that executes agent scripts from the queue",
+        SCHEDULE to "Manage recurring agent schedules (cron, rate, once)"
     )
 }

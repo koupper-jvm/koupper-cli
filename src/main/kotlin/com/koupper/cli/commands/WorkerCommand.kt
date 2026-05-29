@@ -5,6 +5,9 @@ import com.koupper.cli.ANSIColors.ANSI_RED
 import com.koupper.cli.ANSIColors.ANSI_RESET
 import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
 import java.io.File
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -14,14 +17,16 @@ import java.util.concurrent.atomic.AtomicInteger
 //
 // Usage: koupper worker [jobsDir] [--queues=q1,q2] [--concurrency=N]
 //                       [--interval=ms] [--timeout=seconds] [--max-retries=N]
+//                       [--enable-scheduling]
 //
 // Defaults:
-//   jobsDir     = ~/.koupper/jobs
-//   queues      = all subdirectories (excluding logs, commands)
-//   concurrency = 2
-//   interval    = 2000ms
-//   timeout     = 300s (5 min) — env KOUPPER_WORKER_TIMEOUT overrides default
-//   max-retries = 3 — moves to .dead/ after N failures on the same job
+//   jobsDir            = ~/.koupper/jobs
+//   queues             = all subdirectories (excluding logs, commands)
+//   concurrency        = 2
+//   interval           = 2000ms
+//   timeout            = 300s (5 min) — env KOUPPER_WORKER_TIMEOUT overrides default
+//   max-retries        = 3 — moves to .dead/ after N failures on the same job
+//   enable-scheduling  = false (reads ~/.koupper/schedules.json when set)
 class WorkerCommand : Command() {
 
     override fun name(): String = "worker"
@@ -39,12 +44,13 @@ class WorkerCommand : Command() {
             ?.removePrefix("--concurrency=")?.toIntOrNull() ?: 2
         val intervalMs  = args.firstOrNull { it.startsWith("--interval=") }
             ?.removePrefix("--interval=")?.toLongOrNull() ?: 2000L
-        val timeoutSec  = args.firstOrNull { it.startsWith("--timeout=") }
+        val timeoutSec       = args.firstOrNull { it.startsWith("--timeout=") }
             ?.removePrefix("--timeout=")?.toLongOrNull()
             ?: System.getenv("KOUPPER_WORKER_TIMEOUT")?.toLongOrNull()
             ?: 300L
-        val maxRetries  = args.firstOrNull { it.startsWith("--max-retries=") }
+        val maxRetries       = args.firstOrNull { it.startsWith("--max-retries=") }
             ?.removePrefix("--max-retries=")?.toIntOrNull() ?: 3
+        val enableScheduling = args.any { it == "--enable-scheduling" }
 
         jobsDir.mkdirs()
 
@@ -55,6 +61,7 @@ class WorkerCommand : Command() {
         println("  Poll        : ${intervalMs}ms")
         println("  Timeout     : ${timeoutSec}s per job")
         println("  Max retries : $maxRetries before dead-letter")
+        println("  Scheduling  : ${if (enableScheduling) "${ANSI_GREEN_155}enabled${ANSI_RESET}" else "disabled (--enable-scheduling to activate)"}")
         println("  Press Ctrl+C to stop\n")
 
         val running = AtomicBoolean(true)
@@ -64,6 +71,9 @@ class WorkerCommand : Command() {
             println("\n  Worker shutting down…")
             running.set(false)
         })
+
+        // Start scheduling engine if enabled
+        if (enableScheduling) startScheduler(jobsDir, running)
 
         while (running.get()) {
             if (active.get() < concurrency) {
@@ -76,6 +86,69 @@ class WorkerCommand : Command() {
         }
 
         return ""
+    }
+
+    // ── Scheduler engine ──────────────────────────────────────────────────────
+    // Reads ~/.koupper/schedules.json and submits jobs to queues at the right time.
+
+    private fun startScheduler(jobsDir: File, running: AtomicBoolean) {
+        val scheduler = Executors.newScheduledThreadPool(1) { r ->
+            Thread(r, "koupper-scheduler").also { it.isDaemon = true }
+        }
+
+        // Check every minute — matches cron resolution
+        scheduler.scheduleAtFixedRate({
+            if (!running.get()) { scheduler.shutdown(); return@scheduleAtFixedRate }
+            val now     = LocalDateTime.now()
+            val entries = ScheduleStore.load().filter { it.enabled }
+
+            for (entry in entries) {
+                when (entry.type) {
+                    "cron" -> if (entry.cron != null && CronMatcher.matches(entry.cron, now)) {
+                        submitScheduledJob(entry, jobsDir)
+                    }
+                    "once" -> if (entry.runAt != null) {
+                        runCatching {
+                            val runAt = LocalDateTime.parse(entry.runAt, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                            if (now.year  == runAt.year  && now.month  == runAt.month  &&
+                                now.dayOfMonth == runAt.dayOfMonth && now.hour == runAt.hour &&
+                                now.minute == runAt.minute) {
+                                submitScheduledJob(entry, jobsDir)
+                                // Disable after firing so it doesn't repeat
+                                ScheduleStore.setEnabled(entry.id, false)
+                            }
+                        }
+                    }
+                    // "rate" schedules are handled by a separate fixed-rate timer below
+                }
+            }
+        }, 0, 60, TimeUnit.SECONDS)
+
+        // Rate-based schedules: start individual timers
+        val rateEntries = ScheduleStore.load().filter { it.enabled && it.type == "rate" && (it.rateMs ?: 0) > 0 }
+        for (entry in rateEntries) {
+            scheduler.scheduleAtFixedRate({
+                if (!running.get()) return@scheduleAtFixedRate
+                // Re-check enabled in case it was disabled after start
+                if (ScheduleStore.load().any { it.id == entry.id && it.enabled }) {
+                    submitScheduledJob(entry, jobsDir)
+                }
+            }, entry.rateMs!!, entry.rateMs, TimeUnit.MILLISECONDS)
+            println("  ${ANSI_GREEN_155}[SCHEDULER]${ANSI_RESET} ${entry.id} every ${entry.rateMs / 1000}s")
+        }
+
+        val cronEntries = ScheduleStore.load().filter { it.enabled && it.type == "cron" }
+        val onceEntries = ScheduleStore.load().filter { it.enabled && it.type == "once" }
+        println("  ${ANSI_GREEN_155}[SCHEDULER]${ANSI_RESET} loaded: ${cronEntries.size} cron, ${rateEntries.size} rate, ${onceEntries.size} once")
+    }
+
+    private fun submitScheduledJob(entry: ScheduleEntry, jobsDir: File) {
+        val jobId = "${entry.agent}-sched-${System.currentTimeMillis()}"
+        val qDir  = File(jobsDir, entry.queue).also { it.mkdirs() }
+        File(qDir, "$jobId.json").writeText(
+            """{"id":"$jobId","fileName":"${entry.agent}","functionName":"run","scriptPath":"agents/${entry.agent}.kts","sourceType":"script","scheduledBy":"${entry.id}","submittedAt":"${LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))}"}"""
+        )
+        println("  ${ANSI_YELLOW_229}[SCHEDULER]${ANSI_RESET} ⏰ ${entry.id} → $jobId [${entry.queue}]")
     }
 
     // ── Claim loop ────────────────────────────────────────────────────────────
