@@ -5,6 +5,7 @@ import com.koupper.cli.commands.*
 import com.koupper.cli.commands.AvailableCommands.HELP
 import com.koupper.cli.commands.AvailableCommands.MODULE
 import com.koupper.cli.commands.AvailableCommands.WORKER
+import com.koupper.cli.commands.AvailableCommands.SCHEDULE
 import com.koupper.cli.commands.AvailableCommands.NEW
 import com.koupper.cli.commands.AvailableCommands.PROVIDER
 import com.koupper.cli.commands.AvailableCommands.RECONCILE
@@ -65,7 +66,8 @@ class CommandManager {
             PROVIDER to ProviderCommand(),
             INFRA to InfraCommand(),
             RECONCILE to ReconcileCommand(),
-            WORKER  to WorkerCommand()
+            WORKER   to WorkerCommand(),
+            SCHEDULE to ScheduleCommand()
         )
     }
 

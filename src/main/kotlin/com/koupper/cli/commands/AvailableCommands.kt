@@ -15,7 +15,8 @@ object AvailableCommands {
     const val PROVIDER = "provider"
     const val INFRA = "infra"
     const val RECONCILE = "reconcile"
-    const val WORKER  = "worker"
+    const val WORKER   = "worker"
+    const val SCHEDULE = "schedule"
 
     fun commands(): Map<String, String> = mapOf(
         NEW to "Creates a module or script",
@@ -27,6 +28,7 @@ object AvailableCommands {
         PROVIDER to "Lists available service providers and environment requirements",
         INFRA to "Runs Terraform-based infrastructure lifecycle commands",
         RECONCILE to "Orchestrates infra/preflight/deploy/smoke/rollback pipelines",
-        WORKER  to "Starts a job worker daemon that executes agent scripts from the queue"
+        WORKER   to "Starts a job worker daemon that executes agent scripts from the queue",
+        SCHEDULE to "Manage recurring agent schedules (cron, rate, once)"
     )
 }
