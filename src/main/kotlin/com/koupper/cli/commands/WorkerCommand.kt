@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger
 //
 // Usage: koupper worker [jobsDir] [--queues=q1,q2] [--concurrency=N]
 //                       [--interval=ms] [--timeout=seconds] [--max-retries=N]
-//                       [--enable-scheduling]
+//                       [--enable-scheduling] [--status]
 //
 // Defaults:
 //   jobsDir            = ~/.koupper/jobs
@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger
 //   timeout            = 300s (5 min) — env KOUPPER_WORKER_TIMEOUT overrides default
 //   max-retries        = 3 — moves to .dead/ after N failures on the same job
 //   enable-scheduling  = false (reads ~/.koupper/schedules.json when set)
+//   --status           = print queue snapshot and exit without starting daemon
 class WorkerCommand : Command() {
 
     override fun name(): String = "worker"
@@ -38,6 +39,9 @@ class WorkerCommand : Command() {
     override fun execute(vararg args: String): String {
         val jobsDir     = args.drop(1).firstOrNull { !it.startsWith("--") }
             ?.let { File(it) } ?: File("$home/.koupper/jobs")
+
+        if (args.any { it == "--status" }) return statusSnapshot(jobsDir)
+
         val queues      = args.firstOrNull { it.startsWith("--queues=") }
             ?.removePrefix("--queues=")?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
         val concurrency = args.firstOrNull { it.startsWith("--concurrency=") }
@@ -310,6 +314,62 @@ class WorkerCommand : Command() {
                 "Exception in thread \"main\"" in line
             }
         }
+    }
+
+    private fun statusSnapshot(jobsDir: File): String {
+        val sb = StringBuilder()
+        sb.appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER WORKER STATUS${ANSI_RESET}")
+        sb.appendLine("  Jobs dir : ${jobsDir.absolutePath}\n")
+
+        if (!jobsDir.exists()) {
+            sb.appendLine("  ${ANSI_YELLOW_229}No jobs directory found.${ANSI_RESET}")
+            return sb.toString()
+        }
+
+        val queues = jobsDir.listFiles()
+            ?.filter { it.isDirectory && !it.name.startsWith(".") && it.name !in excluded }
+            ?.sortedBy { it.name }
+            ?: emptyList()
+
+        if (queues.isEmpty()) {
+            sb.appendLine("  No queues found.")
+            return sb.toString()
+        }
+
+        var totalPending = 0; var totalProcessing = 0; var totalFailed = 0; var totalDead = 0
+
+        queues.forEach { qDir ->
+            val pending    = qDir.listFiles { f -> f.name.endsWith(".json") }?.size ?: 0
+            val processing = qDir.listFiles { f -> f.name.endsWith(".json.processing") }?.size ?: 0
+            val failed     = File(qDir, ".failed").listFiles { f -> f.name.endsWith(".json") }?.size ?: 0
+            val dead       = File(qDir, ".dead").listFiles { f -> f.name.endsWith(".json") }?.size ?: 0
+
+            totalPending += pending; totalProcessing += processing
+            totalFailed  += failed;  totalDead       += dead
+
+            val indicator = when {
+                dead > 0        -> "${ANSI_RED}☠${ANSI_RESET}"
+                failed > 0      -> "${ANSI_YELLOW_229}⚠${ANSI_RESET}"
+                processing > 0  -> "${ANSI_GREEN_155}▶${ANSI_RESET}"
+                else            -> "○"
+            }
+            sb.append("  $indicator  ${qDir.name.padEnd(14)}")
+            sb.append("  ${ANSI_YELLOW_229}${pending}p${ANSI_RESET}")
+            sb.append("  ${ANSI_GREEN_155}${processing}▶${ANSI_RESET}")
+            sb.append("  ${ANSI_RED}${failed}f${ANSI_RESET}")
+            sb.append("  ${ANSI_RED}${dead}☠${ANSI_RESET}")
+            sb.appendLine()
+        }
+
+        sb.appendLine()
+        sb.append("  Total  ")
+        sb.append("  ${ANSI_YELLOW_229}${totalPending}p${ANSI_RESET}")
+        sb.append("  ${ANSI_GREEN_155}${totalProcessing}▶${ANSI_RESET}")
+        sb.append("  ${ANSI_RED}${totalFailed}f${ANSI_RESET}")
+        sb.append("  ${ANSI_RED}${totalDead}☠${ANSI_RESET}")
+        sb.appendLine("\n")
+
+        return sb.toString()
     }
 
     private fun extractField(json: String, field: String): String? =
