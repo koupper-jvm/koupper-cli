@@ -37,6 +37,14 @@ class StartCommand : Command() {
         println("\n${ANSI_GREEN_155}  ◈ IGLY CORTEX — Starting${ANSI_RESET}")
         println("  Jobs dir : ${jobsDir.absolutePath}\n")
 
+        // Kill any stale monitor or web UI processes to free ports 18082/18083
+        listOf("koupper-monitor.jar", "CortexWebUiAgent").forEach { pattern ->
+            runCatching {
+                ProcessBuilder("pkill", "-f", pattern).start().waitFor()
+            }
+        }
+        Thread.sleep(800)  // let OS reclaim ports
+
         if (!File(koupperBin).exists()) {
             return "\n  ERROR: koupper binary not found at $koupperBin\n"
         }
