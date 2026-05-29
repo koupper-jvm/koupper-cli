@@ -5,19 +5,23 @@ import com.koupper.cli.ANSIColors.ANSI_RED
 import com.koupper.cli.ANSIColors.ANSI_RESET
 import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
 import java.io.File
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 // Daemon that continuously polls job queues under jobsDir, claims jobs atomically,
 // executes agent scripts via `koupper run`, and writes output to the job log file.
 //
-// Usage: koupper worker [jobsDir] [--queues=q1,q2] [--concurrency=N] [--interval=ms]
+// Usage: koupper worker [jobsDir] [--queues=q1,q2] [--concurrency=N]
+//                       [--interval=ms] [--timeout=seconds] [--max-retries=N]
 //
 // Defaults:
 //   jobsDir     = ~/.koupper/jobs
 //   queues      = all subdirectories (excluding logs, commands)
 //   concurrency = 2
 //   interval    = 2000ms
+//   timeout     = 300s (5 min) — env KOUPPER_WORKER_TIMEOUT overrides default
+//   max-retries = 3 — moves to .dead/ after N failures on the same job
 class WorkerCommand : Command() {
 
     override fun name(): String = "worker"
@@ -35,6 +39,12 @@ class WorkerCommand : Command() {
             ?.removePrefix("--concurrency=")?.toIntOrNull() ?: 2
         val intervalMs  = args.firstOrNull { it.startsWith("--interval=") }
             ?.removePrefix("--interval=")?.toLongOrNull() ?: 2000L
+        val timeoutSec  = args.firstOrNull { it.startsWith("--timeout=") }
+            ?.removePrefix("--timeout=")?.toLongOrNull()
+            ?: System.getenv("KOUPPER_WORKER_TIMEOUT")?.toLongOrNull()
+            ?: 300L
+        val maxRetries  = args.firstOrNull { it.startsWith("--max-retries=") }
+            ?.removePrefix("--max-retries=")?.toIntOrNull() ?: 3
 
         jobsDir.mkdirs()
 
@@ -43,6 +53,8 @@ class WorkerCommand : Command() {
         println("  Queues      : ${if (queues.isEmpty()) "all" else queues.joinToString(", ")}")
         println("  Concurrency : $concurrency")
         println("  Poll        : ${intervalMs}ms")
+        println("  Timeout     : ${timeoutSec}s per job")
+        println("  Max retries : $maxRetries before dead-letter")
         println("  Press Ctrl+C to stop\n")
 
         val running = AtomicBoolean(true)
@@ -57,7 +69,7 @@ class WorkerCommand : Command() {
             if (active.get() < concurrency) {
                 for (qDir in queueDirs(jobsDir, queues)) {
                     if (active.get() >= concurrency) break
-                    claimAndRun(qDir, jobsDir, active, concurrency)
+                    claimAndRun(qDir, jobsDir, active, concurrency, timeoutSec, maxRetries)
                 }
             }
             Thread.sleep(intervalMs)
@@ -68,17 +80,20 @@ class WorkerCommand : Command() {
 
     // ── Claim loop ────────────────────────────────────────────────────────────
 
-    private fun claimAndRun(qDir: File, jobsDir: File, active: AtomicInteger, concurrency: Int) {
-        val pending = qDir.listFiles { f -> f.isFile && f.name.endsWith(".json") }
+    private fun claimAndRun(
+        qDir: File, jobsDir: File,
+        active: AtomicInteger, concurrency: Int,
+        timeoutSec: Long, maxRetries: Int
+    ) {
+        val pending   = qDir.listFiles { f -> f.isFile && f.name.endsWith(".json") }
             ?.sortedBy { it.lastModified() } ?: return
         val failedDir = File(qDir, ".failed").also { it.mkdirs() }
+        val deadDir   = File(qDir, ".dead").also { it.mkdirs() }
 
         for (file in pending) {
             if (active.get() >= concurrency) break
 
             val processingFile = File(file.parent, "${file.name}.processing")
-
-            // Atomic claim — renameTo returns false if another worker got there first
             if (!file.renameTo(processingFile)) continue
 
             active.incrementAndGet()
@@ -89,7 +104,10 @@ class WorkerCommand : Command() {
                         originalName   = file.name,
                         queue          = qDir.name,
                         jobsDir        = jobsDir,
-                        failedDir      = failedDir
+                        failedDir      = failedDir,
+                        deadDir        = deadDir,
+                        timeoutSec     = timeoutSec,
+                        maxRetries     = maxRetries
                     )
                 } finally {
                     active.decrementAndGet()
@@ -98,19 +116,35 @@ class WorkerCommand : Command() {
         }
     }
 
-    // ── Job execution ─────────────────────────────────────────────────────────
+    // ── Job execution with isolation ──────────────────────────────────────────
 
     private fun runJob(
         processingFile: File,
         originalName: String,
         queue: String,
         jobsDir: File,
-        failedDir: File
+        failedDir: File,
+        deadDir: File,
+        timeoutSec: Long,
+        maxRetries: Int
     ) {
         val jobId = processingFile.name.removeSuffix(".json.processing")
 
         fun ack()     { processingFile.delete() }
-        fun release() { processingFile.renameTo(File(failedDir, originalName)) }
+        fun release() {
+            // Dead-letter after maxRetries: count existing .failed entries for this job base
+            val baseName  = originalName.removeSuffix(".json")
+            val failCount = failedDir.listFiles { f ->
+                f.name.startsWith(baseName) && f.name.endsWith(".json")
+            }?.size ?: 0
+
+            if (failCount >= maxRetries) {
+                processingFile.renameTo(File(deadDir, originalName))
+                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ☠ $jobId → .dead/ (exceeded $maxRetries retries)")
+            } else {
+                processingFile.renameTo(File(failedDir, originalName))
+            }
+        }
 
         val jobJson = runCatching { processingFile.readText() }.getOrElse { e ->
             println("  ${ANSI_RED}[WORKER] ERROR reading $jobId: ${e.message}${ANSI_RESET}")
@@ -118,7 +152,7 @@ class WorkerCommand : Command() {
         }
 
         val scriptPath = extractField(jobJson, "scriptPath") ?: run {
-            println("  ${ANSI_RED}[WORKER] ERROR: no scriptPath in job $jobId${ANSI_RESET}")
+            println("  ${ANSI_RED}[WORKER] ERROR: no scriptPath in $jobId${ANSI_RESET}")
             release(); return
         }
 
@@ -130,37 +164,47 @@ class WorkerCommand : Command() {
         val logFile = File(jobsDir, "logs/$queue").also { it.mkdirs() }
             .let { File(it, "$jobId.log") }
 
-        println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET} ▶ $jobId  [$queue]")
+        println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET} ▶ $jobId  [$queue]  (timeout: ${timeoutSec}s)")
         val startMs = System.currentTimeMillis()
 
-        val exitCode = runCatching {
-            val proc = ProcessBuilder(koupperBin, "run", scriptFile.absolutePath)
+        val proc = runCatching {
+            ProcessBuilder(koupperBin, "run", scriptFile.absolutePath)
                 .redirectErrorStream(true)
                 .start()
-
-            // Stream output to log file so the monitor can tail it live
-            Thread {
-                proc.inputStream.bufferedReader().forEachLine { line ->
-                    logFile.appendText("$line\n")
-                }
-            }.also { it.isDaemon = true }.start()
-
-            proc.waitFor()
         }.getOrElse { e ->
-            logFile.appendText("[WORKER ERROR] ${e.message}\n")
-            1
+            logFile.appendText("[WORKER ERROR] Could not start process: ${e.message}\n")
+            release(); return
         }
 
-        val elapsed = System.currentTimeMillis() - startMs
+        // Stream output to log file in a daemon thread
+        Thread {
+            proc.inputStream.bufferedReader().forEachLine { line ->
+                logFile.appendText("$line\n")
+            }
+        }.also { it.isDaemon = true }.start()
 
-        if (exitCode == 0) {
-            println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} ✓ $jobId  (${elapsed}ms)")
-            logFile.appendText("[DONE] ${elapsed}ms\n")
-            ack()
-        } else {
-            println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ✗ $jobId  exit=$exitCode  (${elapsed}ms)")
-            logFile.appendText("[FAILED] exit=$exitCode  ${elapsed}ms\n")
-            release()
+        // Wait with timeout — isolates the worker from hanging agents
+        val finished = proc.waitFor(timeoutSec, TimeUnit.SECONDS)
+        val elapsed  = System.currentTimeMillis() - startMs
+
+        when {
+            !finished -> {
+                proc.destroyForcibly()
+                logFile.appendText("[TIMEOUT] Job exceeded ${timeoutSec}s — process killed\n")
+                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ⏱ $jobId timed out (${timeoutSec}s) — killed")
+                release()
+            }
+            proc.exitValue() == 0 -> {
+                logFile.appendText("[DONE] ${elapsed}ms\n")
+                println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} ✓ $jobId  (${elapsed}ms)")
+                ack()
+            }
+            else -> {
+                val exit = proc.exitValue()
+                logFile.appendText("[FAILED] exit=$exit  ${elapsed}ms\n")
+                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ✗ $jobId  exit=$exit  (${elapsed}ms)")
+                release()
+            }
         }
     }
 
@@ -174,10 +218,6 @@ class WorkerCommand : Command() {
         else
             queues.map { File(jobsDir, it) }.filter { it.isDirectory }
 
-    // Resolves scriptPath to an actual File using three strategies:
-    //   1. Absolute path
-    //   2. Relative to ~/.koupper/  (e.g. "agents/DataAgent.kts")
-    //   3. Bare filename in ~/.koupper/agents/
     private fun resolveScript(scriptPath: String): File? {
         File(scriptPath).takeIf { it.isAbsolute && it.exists() }?.let { return it }
         File("$home/.koupper/$scriptPath").takeIf { it.exists() }?.let { return it }
@@ -185,7 +225,6 @@ class WorkerCommand : Command() {
         return null
     }
 
-    // Lightweight JSON string field extractor — no Jackson dependency in the worker loop.
     private fun extractField(json: String, field: String): String? =
         Regex(""""$field"\s*:\s*"([^"\\]*)"""").find(json)?.groupValues?.get(1)
 }
