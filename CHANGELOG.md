@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--timeout=<seconds>` (default 300, env `KOUPPER_WORKER_TIMEOUT`) — kills the subprocess if it runs longer than N seconds and moves the job to `.failed/`.
   - `--max-retries=<N>` (default 3) — after N failures on the same job, moves it to `.dead/` instead of `.failed/` to prevent infinite retry loops.
   - `--enable-scheduling` — activates the built-in scheduler engine that reads `~/.koupper/schedules.json` and enqueues jobs when their cron/rate/once trigger fires.
+- `koupper doctor` — diagnoses the Koupper runtime environment in one command. Checks: env vars (`KOUPPER_LLM_MODEL_PATH`, `KOUPPER_LLM_EXECUTABLE`), installed JARs (octopus, cli, monitor), ports (9998 octopus · 8081 llama-server · 18082 MCP · 18083 Web UI), job queues (pending/processing/failed/dead per queue), installed agents, and configured schedules. Output uses ✓/⚠/✗ with a summary error/warning count.
 - `koupper schedule <subcommand>` — manage agent schedules stored in `~/.koupper/schedules.json`.
   - `add <agentFile> --cron="0 8 * * 1-5" [--id=<id>] [--queue=<queue>]` — schedule by cron expression (5-field: min hour day month weekday).
   - `add <agentFile> --rate=<ms> [--id=<id>]` — schedule by fixed interval in milliseconds.
