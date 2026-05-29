@@ -8,6 +8,7 @@ import com.koupper.cli.commands.AvailableCommands.START
 import com.koupper.cli.commands.AvailableCommands.MONITOR
 import com.koupper.cli.commands.AvailableCommands.WORKER
 import com.koupper.cli.commands.AvailableCommands.SCHEDULE
+import com.koupper.cli.commands.AvailableCommands.DOCTOR
 import com.koupper.cli.commands.AvailableCommands.NEW
 import com.koupper.cli.commands.AvailableCommands.PROVIDER
 import com.koupper.cli.commands.AvailableCommands.RECONCILE
@@ -71,7 +72,8 @@ class CommandManager {
             START    to StartCommand(),
             MONITOR  to MonitorCommand(),
             WORKER   to WorkerCommand(),
-            SCHEDULE to ScheduleCommand()
+            SCHEDULE to ScheduleCommand(),
+            DOCTOR   to DoctorCommand()
         )
     }
 

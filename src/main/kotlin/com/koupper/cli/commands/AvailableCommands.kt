@@ -19,6 +19,7 @@ object AvailableCommands {
     const val MONITOR  = "monitor"
     const val WORKER   = "worker"
     const val SCHEDULE = "schedule"
+    const val DOCTOR   = "doctor"
 
     fun commands(): Map<String, String> = mapOf(
         NEW to "Creates a module or script",
@@ -33,6 +34,7 @@ object AvailableCommands {
         START    to "Start the full CORTEX stack: worker + web UI + monitor in one command",
         MONITOR  to "Launches the IGLY CORTEX real-time swarm dashboard",
         WORKER   to "Starts a job worker daemon that executes agent scripts from the queue",
-        SCHEDULE to "Manage recurring agent schedules (cron, rate, once)"
+        SCHEDULE to "Manage recurring agent schedules (cron, rate, once)",
+        DOCTOR   to "Diagnose the Koupper runtime: env vars, ports, queues, agents, schedules"
     )
 }
