@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `koupper worker [jobsDir] [--queues=q1,q2] [--concurrency=N] [--interval=ms]` — job worker daemon. Polls `~/.koupper/jobs/` queue directories, claims jobs atomically via POSIX `renameTo`, executes agent `.kts` scripts via `koupper run`, and streams output to `logs/<queue>/<jobId>.log`. Completes the file-based swarm execution cycle.
+
+---
+
 - Added framework-level `infra` command group with `init`, `validate`, `plan`, `apply`, `drift`, and `output` subcommands.
 - Added `reconcile run` orchestrator command with configurable stages (`infra`, `preflight`, `deploy`, `smoke`, `rollback`) and policies (`strict`, `continue_on_error`, `abort_on_failure`).
 - Infra/reconcile responses now use a stable JSON contract (`ok`, `stage`, `exitCode`, `durationMs`, `warnings`, `errors`, `artifacts`, `nextAction`) for CI automation.
