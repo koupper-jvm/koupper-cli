@@ -18,6 +18,7 @@ object AvailableCommands {
     const val WORKER   = "worker"
     const val SCHEDULE = "schedule"
     const val DOCTOR   = "doctor"
+    const val AGENT    = "agent"
 
     fun commands(): Map<String, String> = mapOf(
         NEW to "Creates a module or script",
@@ -31,6 +32,7 @@ object AvailableCommands {
         RECONCILE to "Orchestrates infra/preflight/deploy/smoke/rollback pipelines",
         WORKER   to "Starts a job worker daemon that executes agent scripts from the queue",
         SCHEDULE to "Manage recurring agent schedules (cron, rate, once)",
-        DOCTOR   to "Diagnose the Koupper runtime: env vars, ports, queues, agents, schedules"
+        DOCTOR   to "Diagnose the Koupper runtime: env vars, ports, queues, agents, schedules",
+        AGENT    to "Manage installed agents: list, info, install, remove"
     )
 }
