@@ -272,8 +272,27 @@ class WorkerCommand : Command() {
                 release()
             }
             proc.exitValue() == 0 && !logContainsScriptError(logFile) -> {
+                // Extract script return value: last non-empty line before [DONE]
+                val scriptResult = runCatching {
+                    logFile.readLines()
+                        .filter { it.isNotBlank() && !it.startsWith("[DEBUG]") && !it.startsWith("[DONE]") }
+                        .lastOrNull()
+                        ?.replace(Regex("\\[[;\\d]*m"), "")  // strip ANSI
+                        ?.take(500)
+                }.getOrNull()
+
                 logFile.appendText("[DONE] ${elapsed}ms\n")
                 println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} ✓ $jobId  (${elapsed}ms)")
+
+                // Write result file before ack so WebUI watcher can read it
+                runCatching {
+                    if (!scriptResult.isNullOrBlank()) {
+                        val doneDir = File(processingFile.parent, ".done").also { it.mkdirs() }
+                        val escaped = scriptResult.replace("\\", "\\\\").replace("\"", "\\\"")
+                        File(doneDir, "$jobId.result.json")
+                            .writeText("""{"id":"$jobId","result":"$escaped"}""")
+                    }
+                }
                 ack()
             }
             else -> {
