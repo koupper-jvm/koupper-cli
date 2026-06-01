@@ -127,7 +127,7 @@ class ModuleCommandAddScriptsTest {
         val root = createWorkspace()
         val moduleDir = createModule(root, moduleName = "demo", packageName = "demo.app")
 
-        val src = File(root, "extensions\\hello-world.kts")
+        val src = File(root, "extensions/hello-world.kts")
         src.parentFile.mkdirs()
         src.writeText("println(\"hello\")")
 
