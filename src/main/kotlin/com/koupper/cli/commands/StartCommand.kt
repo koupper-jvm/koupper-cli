@@ -50,6 +50,19 @@ class StartCommand : Command() {
             return "\n  ERROR: koupper binary not found at $koupperBin\n"
         }
 
+        // Boot octopus directly so it inherits the full env (KOUPPER_LLM_PROVIDER etc.)
+        // NOT added to children — octopus must survive past monitor exit for clean shutdown.
+        val octopusJar = File("$home/.koupper/libs/octopus.jar")
+        if (octopusJar.exists()) {
+            val java = ProcessHandle.current().info().command().orElse("java")
+            ProcessBuilder(java, "-jar", octopusJar.absolutePath)
+                .also { pb -> forwardEnv(pb) }
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+            Thread.sleep(2500) // give octopus time to bind :9998
+        }
+
         val children = mutableListOf<Process>()
 
         Runtime.getRuntime().addShutdownHook(Thread {
@@ -91,6 +104,24 @@ class StartCommand : Command() {
             println("  ${ANSI_GREEN_155}[web ui]${ANSI_RESET}   http://localhost:18083  (log: ~/.koupper/logs/webui.log)")
         }
 
+        // ── 2b. CORTEX agent (long-running, outside worker to avoid timeout) ──
+        val cortexAgent = File(agentsDir, "CortexAgent.kts")
+        if (cortexAgent.exists()) {
+            val cortexLog = File(home, ".koupper/jobs/logs/cortex/cortex-session.log")
+                .also { it.parentFile.mkdirs() }
+            cortexLog.writeText("")
+            val cortex = ProcessBuilder(koupperBin, "run", cortexAgent.absolutePath)
+                .also { pb ->
+                    forwardEnv(pb)
+                    pb.environment()["CORTEX_JOBS_DIR"] = jobsDir.absolutePath
+                }
+                .redirectErrorStream(true)
+                .redirectOutput(ProcessBuilder.Redirect.appendTo(cortexLog))
+                .start()
+            children.add(cortex)
+            println("  ${ANSI_GREEN_155}[cortex]${ANSI_RESET}   started (log: ~/.koupper/jobs/logs/cortex/cortex-session.log)")
+        }
+
         println()
         println("  ${ANSI_YELLOW_229}MCP tools${ANSI_RESET} : http://localhost:18082/mcp/tools")
         println()
@@ -117,7 +148,13 @@ class StartCommand : Command() {
         listOf(
             "KOUPPER_LLM_MODEL_PATH",
             "KOUPPER_LLM_EXECUTABLE",
-            "KOUPPER_WORKER_TIMEOUT"
+            "KOUPPER_WORKER_TIMEOUT",
+            "KOUPPER_LLM_PROVIDER",
+            "KOUPPER_LLM_API_BASE",
+            "KOUPPER_LLM_API_KEY",
+            "KOUPPER_LLM_MODEL",
+            "KOUPPER_LLM_MAX_TOKENS",
+            "KOUPPER_LLM_TEMPERATURE"
         ).forEach { key ->
             System.getenv(key)?.let { pb.environment()[key] = it }
         }
