@@ -76,17 +76,21 @@ class StartCommand : Command() {
             val agentsDir = File(home, ".koupper/agents")
             val webAgent  = File(agentsDir, "CortexWebUiAgent.kts")
             if (webAgent.exists()) {
-                val webLog = File(home, ".koupper/logs/webui.log").also { it.parentFile.mkdirs() }
-                val webUi  = ProcessBuilder(koupperBin, "run", webAgent.absolutePath)
-                    .also { pb ->
-                        forwardEnv(pb)
-                        pb.environment()["CORTEX_JOBS_DIR"] = jobsDir.absolutePath
-                    }
-                    .redirectErrorStream(true)
-                    .redirectOutput(ProcessBuilder.Redirect.appendTo(webLog))
-                    .start()
-                children.add(webUi)
-                println("  ${ANSI_GREEN_155}[web ui]${ANSI_RESET}   http://localhost:18083  (log: ~/.koupper/logs/webui.log)")
+                val webPort = resolveWebPort(18083)
+                if (webPort != null) {
+                    val webLog = File(home, ".koupper/logs/webui.log").also { it.parentFile.mkdirs() }
+                    val webUi  = ProcessBuilder(koupperBin, "run", webAgent.absolutePath)
+                        .also { pb ->
+                            forwardEnv(pb)
+                            pb.environment()["CORTEX_JOBS_DIR"] = jobsDir.absolutePath
+                            pb.environment()["CORTEX_WEB_PORT"] = webPort.toString()
+                        }
+                        .redirectErrorStream(true)
+                        .redirectOutput(ProcessBuilder.Redirect.appendTo(webLog))
+                        .start()
+                    children.add(webUi)
+                    println("  ${ANSI_GREEN_155}[web ui]${ANSI_RESET}   http://localhost:$webPort  (log: ~/.koupper/logs/webui.log)")
+                }
             }
             println()
             println("  ${ANSI_YELLOW_229}MCP tools${ANSI_RESET} : http://localhost:18082/mcp/tools")
@@ -101,6 +105,9 @@ class StartCommand : Command() {
                 children.forEach { runCatching { it.destroyForcibly() } }
                 return "\n  ERROR: koupper-monitor.jar not found at ${monitorJar.absolutePath}\n"
             }
+            if (isPortInUse(18083)) {
+                println("  ${ANSI_GREEN_155}[web ui]${ANSI_RESET}   http://localhost:18083")
+            }
             println()
             val java    = ProcessHandle.current().info().command().orElse("java")
             val monitor = ProcessBuilder(java, "-jar", monitorJar.absolutePath, jobsDir.absolutePath)
@@ -112,6 +119,38 @@ class StartCommand : Command() {
         }
 
         return ""
+    }
+
+    private fun isPortInUse(port: Int): Boolean = runCatching {
+        java.net.Socket("localhost", port).use { true }
+    }.getOrDefault(false)
+
+    private fun nextFreePort(from: Int): Int {
+        var p = from
+        while (p < 65535 && isPortInUse(p)) p++
+        return p
+    }
+
+    /**
+     * Returns the port to use for the web UI, or null if the user chose to skip.
+     * - If [preferred] is free → returns it immediately.
+     * - If [preferred] is occupied → asks the user; suggests the next free port.
+     *   Input options: Enter / y → use suggestion | number → use that port | n → skip
+     */
+    private fun resolveWebPort(preferred: Int): Int? {
+        if (!isPortInUse(preferred)) return preferred
+
+        val suggestion = nextFreePort(preferred + 1)
+        print("  ${ANSI_YELLOW_229}[web ui]${ANSI_RESET}   port $preferred is in use. Use $suggestion instead? [Y/n/port] ")
+        System.out.flush()
+
+        return when (val input = readLine()?.trim()?.lowercase() ?: "") {
+            "", "y", "yes" -> suggestion
+            "n", "no"      -> { println("  [web ui]   skipped."); null }
+            else           -> input.toIntOrNull()
+                ?.takeIf { it in 1024..65535 }
+                ?: run { println("  [web ui]   invalid port, skipped."); null }
+        }
     }
 
     private fun forwardEnv(pb: ProcessBuilder) {
