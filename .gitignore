@@ -63,3 +63,6 @@ gradle-app.setting
 
 bin/
 **/bin/
+
+# Runtime artifacts
+.koupper-observability.jsonl
