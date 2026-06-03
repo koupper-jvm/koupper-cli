@@ -7,9 +7,15 @@ import java.io.File
 
 // Starts the Koupper runtime.
 //
-// koupper start          → worker + TUI monitor (terminal mode)
-// koupper start --web    → worker + web UI at :18083 (no TUI)
-// koupper start --scheduling → enables scheduled agents
+// koupper start                      → worker + TUI monitor (terminal mode)
+// koupper start --web                → worker + web API at :18083 (no TUI)
+// koupper start --web --dashboard    → web API + React dashboard dev server
+// koupper start --scheduling         → enables scheduled agents
+//
+// Dashboard path resolution (first match wins):
+//   1. KOUPPER_DASHBOARD_PATH env var
+//   2. ~/koupper-dashboard
+//   3. ~/.koupper/dashboard
 class StartCommand : Command() {
 
     override fun name(): String = "start"
@@ -23,6 +29,7 @@ class StartCommand : Command() {
         val noWorker   = args.any { it == "--no-worker" }
         val webMode    = args.any { it == "--web" }
         val scheduling = args.any { it == "--scheduling" }
+        val dashboard  = args.any { it == "--dashboard" }
 
         jobsDir.mkdirs()
 
@@ -92,6 +99,29 @@ class StartCommand : Command() {
                     println("  ${ANSI_GREEN_155}[web ui]${ANSI_RESET}   http://localhost:$webPort  (log: ~/.koupper/logs/webui.log)")
                 }
             }
+            // ── Dashboard dev server (optional) ──────────────────────────────
+            if (dashboard) {
+                val dashDir = resolveDashboardDir()
+                if (dashDir != null) {
+                    val npm = findNpm()
+                    if (npm != null) {
+                        val dashLog = File(home, ".koupper/logs/dashboard.log").also { it.parentFile.mkdirs() }
+                        val dash = ProcessBuilder(npm, "run", "dev")
+                            .directory(dashDir)
+                            .redirectErrorStream(true)
+                            .redirectOutput(ProcessBuilder.Redirect.appendTo(dashLog))
+                            .start()
+                        children.add(dash)
+                        Thread.sleep(2000)
+                        println("  ${ANSI_GREEN_155}[dashboard]${ANSI_RESET} http://localhost:5173  (log: ~/.koupper/logs/dashboard.log)")
+                    } else {
+                        println("  ${ANSI_YELLOW_229}[dashboard]${ANSI_RESET} npm not found — start manually: cd ${dashDir.absolutePath} && npm run dev")
+                    }
+                } else {
+                    println("  ${ANSI_YELLOW_229}[dashboard]${ANSI_RESET} not found — set KOUPPER_DASHBOARD_PATH or clone to ~/koupper-dashboard")
+                }
+            }
+
             println()
             println("  ${ANSI_YELLOW_229}MCP tools${ANSI_RESET} : http://localhost:18082/mcp/tools")
             println()
@@ -152,6 +182,19 @@ class StartCommand : Command() {
                 ?: run { println("  [web ui]   invalid port, skipped."); null }
         }
     }
+
+    private fun resolveDashboardDir(): File? {
+        val candidates = listOfNotNull(
+            System.getenv("KOUPPER_DASHBOARD_PATH")?.let { File(it) },
+            File(home, "koupper-dashboard"),
+            File(home, ".koupper/dashboard")
+        )
+        return candidates.firstOrNull { it.exists() && File(it, "package.json").exists() }
+    }
+
+    private fun findNpm(): String? =
+        listOf("npm", "/usr/bin/npm", "/usr/local/bin/npm")
+            .firstOrNull { runCatching { ProcessBuilder(it, "--version").start().waitFor() == 0 }.getOrDefault(false) }
 
     private fun forwardEnv(pb: ProcessBuilder) {
         listOf(
