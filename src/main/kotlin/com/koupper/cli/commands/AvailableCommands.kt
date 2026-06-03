@@ -19,10 +19,12 @@ object AvailableCommands {
     const val SCHEDULE = "schedule"
     const val DOCTOR   = "doctor"
     const val AGENT    = "agent"
+    const val WATCH    = "watch"
 
     fun commands(): Map<String, String> = mapOf(
         NEW to "Creates a module or script",
         RUN to "Runs a kotlin script",
+        WATCH to "Watch a project and manage dependencies automatically via Octopus Sentinel",
         DEPLOY to "Deploys a .kts script to a remote Octopus daemon",
         HELP to "Displays information about a command",
         MODULE to "Analyzes and inspects existing modules and their structure.",

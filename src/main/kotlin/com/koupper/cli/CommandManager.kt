@@ -15,6 +15,7 @@ import com.koupper.cli.commands.AvailableCommands.RUN
 import com.koupper.cli.commands.AvailableCommands.DEPLOY
 import com.koupper.cli.commands.AvailableCommands.INFRA
 import com.koupper.cli.commands.AvailableCommands.JOB
+import com.koupper.cli.commands.AvailableCommands.WATCH
 import com.koupper.cli.commands.jobs.JobCommand
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -71,7 +72,8 @@ class CommandManager {
             WORKER   to WorkerCommand(),
             SCHEDULE to ScheduleCommand(),
             DOCTOR   to DoctorCommand(),
-            AGENT    to AgentCommand()
+            AGENT    to AgentCommand(),
+            WATCH    to WatchCommand()
         )
     }
 
