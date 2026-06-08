@@ -330,6 +330,76 @@ class PipelineStatusTest {
     }
 }
 
+// ── PipelineCommand run (single job) ─────────────────────────────────────────
+
+class PipelineRunTest {
+
+    private val command = PipelineCommand()
+    private fun tempDir(): File = Files.createTempDirectory("pipe-run").toFile().also { it.deleteOnExit() }
+
+    @Test
+    fun `creates job file in queue dir`() {
+        val jobs = tempDir()
+        command.execute(jobs.absolutePath, "run", "agents/Fetch.kts", "--queue=default", "--id=fetch-1", "--jobs-dir=${jobs.absolutePath}")
+        assertTrue(File(jobs, "default/fetch-1.json").exists())
+    }
+
+    @Test
+    fun `job file contains scriptPath and fileName`() {
+        val jobs = tempDir()
+        command.execute(jobs.absolutePath, "run", "agents/Fetch.kts", "--id=fetch-2", "--jobs-dir=${jobs.absolutePath}")
+        val content = File(jobs, "default/fetch-2.json").readText()
+        assertTrue(""""scriptPath":"agents/Fetch.kts"""" in content)
+        assertTrue(""""fileName":"Fetch"""" in content)
+    }
+
+    @Test
+    fun `job file contains input when provided`() {
+        val jobs = tempDir()
+        command.execute(jobs.absolutePath, "run", "agents/Fetch.kts", """--input={"n":1}""", "--id=fetch-3", "--jobs-dir=${jobs.absolutePath}")
+        val content = File(jobs, "default/fetch-3.json").readText()
+        assertTrue(""""input":{"n":1}""" in content)
+    }
+
+    @Test
+    fun `job file omits input when absent`() {
+        val jobs = tempDir()
+        command.execute(jobs.absolutePath, "run", "agents/Ping.kts", "--id=ping-1", "--jobs-dir=${jobs.absolutePath}")
+        val content = File(jobs, "default/ping-1.json").readText()
+        assertFalse("\"input\"" in content)
+    }
+
+    @Test
+    fun `auto-generates id from agent name`() {
+        val jobs = tempDir()
+        val out = command.execute(jobs.absolutePath, "run", "agents/AutoAgent.kts", "--jobs-dir=${jobs.absolutePath}")
+        assertTrue("Enqueued" in out)
+        val qDir = File(jobs, "default")
+        assertTrue(qDir.listFiles()?.any { it.name.startsWith("AutoAgent-") && it.name.endsWith(".json") } == true)
+    }
+
+    @Test
+    fun `respects custom queue`() {
+        val jobs = tempDir()
+        command.execute(jobs.absolutePath, "run", "agents/A.kts", "--queue=priority", "--id=a-1", "--jobs-dir=${jobs.absolutePath}")
+        assertTrue(File(jobs, "priority/a-1.json").exists())
+    }
+
+    @Test
+    fun `output shows agent path and track hint`() {
+        val jobs = tempDir()
+        val out = command.execute(jobs.absolutePath, "run", "agents/Fetch.kts", "--id=f-1", "--jobs-dir=${jobs.absolutePath}")
+        assertTrue("agents/Fetch.kts" in out)
+        assertTrue("worker" in out)
+    }
+
+    @Test
+    fun `run without agent returns error`() {
+        val out = command.execute("pipeline", "run")
+        assertTrue("required" in out.lowercase())
+    }
+}
+
 // ── PipelineCommand new (scaffold) ───────────────────────────────────────────
 
 class PipelineNewTest {

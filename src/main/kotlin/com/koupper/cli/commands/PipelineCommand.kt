@@ -9,6 +9,7 @@ import java.io.File
 // Submits, tracks, and scaffolds multi-step pipelines without writing a .kts script.
 //
 // Usage:
+//   koupper pipeline run    <agent.kts>     [--input='{...}'] [--queue=q] [--id=name]
 //   koupper pipeline new    <name>          [--steps=N] [--queue=<queue>]
 //   koupper pipeline submit <pipeline.json> [--jobs-dir=path]
 //   koupper pipeline status <pipelineId>    [--jobs-dir=path]
@@ -49,6 +50,15 @@ class PipelineCommand : Command() {
                 val queue = args.firstOrNull { it.startsWith("--queue=") }
                     ?.removePrefix("--queue=") ?: "default"
                 scaffoldPipeline(name, stepsCount, queue, File(args[0]))
+            }
+            "run" -> {
+                val agentPath = positionals.getOrNull(1)
+                    ?: return "\n  ${ANSI_RED}Error: agent path required${ANSI_RESET}\n  Usage: koupper pipeline run <agent.kts> [--input='{...}'] [--queue=q] [--id=name]\n"
+                val queue   = args.firstOrNull { it.startsWith("--queue=") }?.removePrefix("--queue=") ?: "default"
+                val input   = args.firstOrNull { it.startsWith("--input=") }?.removePrefix("--input=")
+                val jobId   = args.firstOrNull { it.startsWith("--id=") }?.removePrefix("--id=")
+                    ?: "${File(agentPath).nameWithoutExtension}-${System.currentTimeMillis() % 100000}"
+                runSingle(agentPath, input, queue, jobId, jobsDir)
             }
             "submit" -> {
                 val path = positionals.getOrNull(1)
@@ -119,6 +129,32 @@ class PipelineCommand : Command() {
             stepNames.forEach { appendLine("  ${ANSI_GREEN_155}✓${ANSI_RESET}  agents/$it.kts") }
             appendLine()
             append("  Next: ${ANSI_YELLOW_229}koupper pipeline submit $name/pipeline.json${ANSI_RESET}")
+        }
+    }
+
+    // ── Run (single job) ─────────────────────────────────────────────────────
+
+    private fun runSingle(agentPath: String, input: String?, queue: String, jobId: String, jobsDir: File): String {
+        val fileName = File(agentPath).nameWithoutExtension
+        val jobJson = buildString {
+            append("""{"id":"$jobId"""")
+            append(""","scriptPath":"$agentPath"""")
+            append(""","fileName":"$fileName"""")
+            append(""","functionName":"run","sourceType":"script"""")
+            if (input != null) append(""","input":$input""")
+            append("}")
+        }
+        val qDir = File(jobsDir, queue).also { it.mkdirs() }
+        File(qDir, "$jobId.json").writeText(jobJson)
+
+        return buildString {
+            appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER PIPELINE RUN${ANSI_RESET}")
+            appendLine()
+            appendLine("  ${ANSI_GREEN_155}✓${ANSI_RESET}  Enqueued : $jobId  [$queue]")
+            appendLine("  Agent    : $agentPath")
+            if (input != null) appendLine("  Input    : $input")
+            appendLine()
+            append("  Track: ${ANSI_YELLOW_229}koupper worker --status${ANSI_RESET}")
         }
     }
 
@@ -289,9 +325,10 @@ class PipelineCommand : Command() {
         appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER PIPELINE${ANSI_RESET}")
         appendLine()
         appendLine("  Subcommands:")
-        appendLine("    new    <name>          [--steps=N] [--queue=<queue>]   Scaffold pipeline directory + agent stubs")
-        appendLine("    submit <pipeline.json> [--jobs-dir=path]               Enqueue a multi-step pipeline")
-        appendLine("    status <pipelineId>    [--jobs-dir=path]               Show pipeline step progress")
+        appendLine("    run    <agent.kts>     [--input='{...}'] [--queue=q] [--id=name]   Enqueue a single agent job")
+        appendLine("    new    <name>          [--steps=N] [--queue=<queue>]               Scaffold pipeline directory + agent stubs")
+        appendLine("    submit <pipeline.json> [--jobs-dir=path]                           Enqueue a multi-step pipeline")
+        appendLine("    status <pipelineId>    [--jobs-dir=path]                           Show pipeline step progress")
         appendLine()
         appendLine("  Pipeline file format (pipeline.json):")
         appendLine("    {")
