@@ -10,6 +10,7 @@ import com.koupper.cli.commands.AvailableCommands.WORKER
 import com.koupper.cli.commands.AvailableCommands.SCHEDULE
 import com.koupper.cli.commands.AvailableCommands.DOCTOR
 import com.koupper.cli.commands.AvailableCommands.AGENT
+import com.koupper.cli.commands.AvailableCommands.PIPELINE
 import com.koupper.cli.commands.AvailableCommands.NEW
 import com.koupper.cli.commands.AvailableCommands.PROVIDER
 import com.koupper.cli.commands.AvailableCommands.RECONCILE
@@ -75,7 +76,8 @@ class CommandManager {
             WORKER   to WorkerCommand(),
             SCHEDULE to ScheduleCommand(),
             DOCTOR   to DoctorCommand(),
-            AGENT    to AgentCommand()
+            AGENT    to AgentCommand(),
+            PIPELINE to PipelineCommand()
         )
     }
 
