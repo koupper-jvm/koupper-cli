@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger
 // Usage: koupper worker [jobsDir] [--queues=q1,q2] [--concurrency=N]
 //                       [--interval=ms] [--timeout=seconds] [--max-retries=N]
 //                       [--enable-scheduling] [--status] [--retry [queue]]
-//                       [--purge dead|failed [queue]]
+//                       [--purge dead|failed [queue]] [--logs [jobId]]
 //
 // Defaults:
 //   jobsDir            = ~/.koupper/jobs
@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger
 //   --status           = print queue snapshot and exit without starting daemon
 //   --retry [queue]    = move all .failed/ jobs back to queue and exit
 //   --purge dead|failed [queue] = delete jobs from .dead/ or .failed/ and exit
+//   --logs [jobId]     = list recent job logs (no jobId) or print a specific job log
 class WorkerCommand : Command() {
 
     override fun name(): String = "worker"
@@ -56,6 +57,12 @@ class WorkerCommand : Command() {
             val bucket      = args.getOrNull(purgeIdx + 1)?.takeIf { !it.startsWith("--") }
             val targetQueue = args.getOrNull(purgeIdx + 2)?.takeIf { !it.startsWith("--") }
             return purgeBucket(jobsDir, bucket, targetQueue)
+        }
+
+        val logsIdx = args.indexOfFirst { it == "--logs" }
+        if (logsIdx >= 0) {
+            val jobId = args.getOrNull(logsIdx + 1)?.takeIf { !it.startsWith("--") }
+            return showLogs(jobsDir, jobId)
         }
 
         val queues      = args.firstOrNull { it.startsWith("--queues=") }
@@ -508,6 +515,86 @@ class WorkerCommand : Command() {
 
         if (total == 0) sb.appendLine("  No $bucket jobs to purge.")
         else sb.appendLine("\n  ${ANSI_GREEN_155}$total job(s) purged from .$bucket.${ANSI_RESET}")
+
+        return sb.toString()
+    }
+
+    // ── Logs: list recent or show specific job log ─────────────────────────────
+
+    private fun showLogs(jobsDir: File, jobId: String?): String {
+        val sb      = StringBuilder()
+        val logsDir = File(jobsDir, "logs")
+
+        if (jobId == null) {
+            sb.appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER WORKER LOGS${ANSI_RESET}")
+            sb.appendLine("  Logs dir : ${logsDir.absolutePath}\n")
+
+            if (!logsDir.exists()) {
+                sb.appendLine("  No logs directory found.")
+                return sb.toString()
+            }
+
+            val allLogs = logsDir.walkTopDown()
+                .filter { it.isFile && it.name.endsWith(".log") }
+                .sortedByDescending { it.lastModified() }
+                .take(20)
+                .toList()
+
+            if (allLogs.isEmpty()) {
+                sb.appendLine("  No logs found.")
+                return sb.toString()
+            }
+
+            sb.appendLine("  Recent jobs (latest ${allLogs.size}):\n")
+            val idW = allLogs.maxOf { it.nameWithoutExtension.length }.coerceAtLeast(6) + 2
+            sb.append("  ${"JOB ID".padEnd(idW)}${"QUEUE".padEnd(12)}STATUS\n")
+            sb.append("  ${"─".repeat(idW)}${"─".repeat(12)}──────────\n")
+
+            allLogs.forEach { f ->
+                val id    = f.nameWithoutExtension
+                val queue = f.parentFile.name
+                val text  = runCatching { f.readText() }.getOrDefault("")
+                val status = when {
+                    "[DONE]"    in text -> "${ANSI_GREEN_155}done${ANSI_RESET}"
+                    "[TIMEOUT]" in text -> "${ANSI_RED}timeout${ANSI_RESET}"
+                    "[FAILED]"  in text -> "${ANSI_RED}failed${ANSI_RESET}"
+                    else                -> "${ANSI_YELLOW_229}running?${ANSI_RESET}"
+                }
+                sb.appendLine("  ${id.padEnd(idW)}${queue.padEnd(12)}$status")
+            }
+
+            sb.appendLine("\n  Run: koupper worker --logs <jobId>")
+            return sb.toString()
+        }
+
+        // ── Specific job ──────────────────────────────────────────────────────
+
+        sb.appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER WORKER LOGS${ANSI_RESET}  $jobId\n")
+
+        if (!logsDir.exists()) {
+            sb.appendLine("  ${ANSI_RED}No logs directory found.${ANSI_RESET}")
+            return sb.toString()
+        }
+
+        val matches = logsDir.listFiles()
+            ?.filter { it.isDirectory }
+            ?.mapNotNull { qDir -> File(qDir, "$jobId.log").takeIf { it.exists() } }
+            ?: emptyList()
+
+        if (matches.isEmpty()) {
+            sb.appendLine("  ${ANSI_RED}No log found for: $jobId${ANSI_RESET}")
+            sb.appendLine("  Searched: ${logsDir.absolutePath}")
+            return sb.toString()
+        }
+
+        matches.forEach { logFile ->
+            val queue = logFile.parentFile.name
+            sb.appendLine("  ${ANSI_YELLOW_229}[$queue]${ANSI_RESET}  ${logFile.absolutePath}")
+            sb.appendLine("  ${"─".repeat(60)}")
+            sb.append(runCatching { logFile.readText() }.getOrDefault("(unreadable)"))
+            if (!sb.endsWith("\n")) sb.appendLine()
+            sb.appendLine("  ${"─".repeat(60)}")
+        }
 
         return sb.toString()
     }

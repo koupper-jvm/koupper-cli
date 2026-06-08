@@ -8,6 +8,146 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 
+// ── --logs ────────────────────────────────────────────────────────────────────
+
+class WorkerLogsCommandTest {
+
+    private val command = WorkerCommand()
+    private fun tempDir(): File = java.nio.file.Files.createTempDirectory("wc-logs").toFile()
+        .also { it.deleteOnExit() }
+
+    private fun writeLog(jobsDir: File, queue: String, jobId: String, content: String): File {
+        val dir = File(jobsDir, "logs/$queue").also { it.mkdirs() }
+        return File(dir, "$jobId.log").also { it.writeText(content) }
+    }
+
+    // ── --logs (no jobId) — list mode ─────────────────────────────────────────
+
+    @Test
+    fun `list mode with no logs dir reports not found`() {
+        val dir = tempDir()
+        val out = command.execute("worker", dir.absolutePath, "--logs")
+        assertTrue("No logs directory" in out)
+    }
+
+    @Test
+    fun `list mode with empty logs dir reports no logs`() {
+        val dir = tempDir()
+        File(dir, "logs").mkdirs()
+        val out = command.execute("worker", dir.absolutePath, "--logs")
+        assertTrue("No logs found" in out)
+    }
+
+    @Test
+    fun `list mode shows job ids`() {
+        val dir = tempDir()
+        writeLog(dir, "default", "job-abc", "[DONE] 1200ms\n")
+        writeLog(dir, "default", "job-xyz", "[FAILED] exit=1\n")
+
+        val out = command.execute("worker", dir.absolutePath, "--logs")
+        assertTrue("job-abc" in out)
+        assertTrue("job-xyz" in out)
+    }
+
+    @Test
+    fun `list mode shows done status for completed jobs`() {
+        val dir = tempDir()
+        writeLog(dir, "default", "job-ok", "output line\n[DONE] 500ms\n")
+
+        val out = command.execute("worker", dir.absolutePath, "--logs")
+        assertTrue("done" in out)
+    }
+
+    @Test
+    fun `list mode shows failed status`() {
+        val dir = tempDir()
+        writeLog(dir, "default", "job-bad", "error output\n[FAILED] exit=1\n")
+
+        val out = command.execute("worker", dir.absolutePath, "--logs")
+        assertTrue("failed" in out)
+    }
+
+    @Test
+    fun `list mode shows timeout status`() {
+        val dir = tempDir()
+        writeLog(dir, "default", "job-slow", "[TIMEOUT] Job exceeded 300s — process killed\n")
+
+        val out = command.execute("worker", dir.absolutePath, "--logs")
+        assertTrue("timeout" in out)
+    }
+
+    @Test
+    fun `list mode shows hint to view specific log`() {
+        val dir = tempDir()
+        writeLog(dir, "default", "job-1", "[DONE] 100ms\n")
+
+        val out = command.execute("worker", dir.absolutePath, "--logs")
+        assertTrue("koupper worker --logs" in out)
+    }
+
+    @Test
+    fun `list mode shows queue name for each job`() {
+        val dir = tempDir()
+        writeLog(dir, "priority", "job-p", "[DONE] 200ms\n")
+
+        val out = command.execute("worker", dir.absolutePath, "--logs")
+        assertTrue("priority" in out)
+    }
+
+    // ── --logs <jobId> — detail mode ──────────────────────────────────────────
+
+    @Test
+    fun `detail mode shows log content`() {
+        val dir = tempDir()
+        writeLog(dir, "default", "job-42", "step 1 done\nstep 2 done\n[DONE] 800ms\n")
+
+        val out = command.execute("worker", dir.absolutePath, "--logs", "job-42")
+        assertTrue("step 1 done" in out)
+        assertTrue("step 2 done" in out)
+        assertTrue("[DONE]" in out)
+    }
+
+    @Test
+    fun `detail mode reports not found for unknown jobId`() {
+        val dir = tempDir()
+        File(dir, "logs/default").mkdirs()
+
+        val out = command.execute("worker", dir.absolutePath, "--logs", "job-nonexistent")
+        assertTrue("No log found" in out)
+        assertTrue("job-nonexistent" in out)
+    }
+
+    @Test
+    fun `detail mode with no logs dir reports not found`() {
+        val dir = tempDir()
+        val out = command.execute("worker", dir.absolutePath, "--logs", "job-abc")
+        assertTrue("No logs directory" in out)
+    }
+
+    @Test
+    fun `detail mode shows queue name`() {
+        val dir = tempDir()
+        writeLog(dir, "urgent", "job-u", "[DONE] 100ms\n")
+
+        val out = command.execute("worker", dir.absolutePath, "--logs", "job-u")
+        assertTrue("urgent" in out)
+    }
+
+    @Test
+    fun `detail mode finds log across multiple queues`() {
+        val dir = tempDir()
+        writeLog(dir, "alpha",   "job-in-alpha", "[DONE] 100ms\n")
+        writeLog(dir, "beta",    "job-in-beta",  "[DONE] 200ms\n")
+
+        val outAlpha = command.execute("worker", dir.absolutePath, "--logs", "job-in-alpha")
+        val outBeta  = command.execute("worker", dir.absolutePath, "--logs", "job-in-beta")
+
+        assertTrue("alpha" in outAlpha)
+        assertFalse("beta" in outAlpha)
+        assertTrue("beta" in outBeta)
+    }
+}
+
 // ── --retry ───────────────────────────────────────────────────────────────────
 
 class WorkerRetryCommandTest {
