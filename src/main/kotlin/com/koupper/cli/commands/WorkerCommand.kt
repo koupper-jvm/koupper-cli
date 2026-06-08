@@ -76,7 +76,6 @@ class WorkerCommand : Command() {
             running.set(false)
         })
 
-        // Start scheduling engine if enabled
         if (enableScheduling) startScheduler(jobsDir, running)
 
         while (running.get()) {
@@ -93,14 +92,12 @@ class WorkerCommand : Command() {
     }
 
     // ── Scheduler engine ──────────────────────────────────────────────────────
-    // Reads ~/.koupper/schedules.json and submits jobs to queues at the right time.
 
     private fun startScheduler(jobsDir: File, running: AtomicBoolean) {
         val scheduler = Executors.newScheduledThreadPool(1) { r ->
             Thread(r, "koupper-scheduler").also { it.isDaemon = true }
         }
 
-        // Check every minute — matches cron resolution
         scheduler.scheduleAtFixedRate({
             if (!running.get()) { scheduler.shutdown(); return@scheduleAtFixedRate }
             val now     = LocalDateTime.now()
@@ -118,22 +115,18 @@ class WorkerCommand : Command() {
                                 now.dayOfMonth == runAt.dayOfMonth && now.hour == runAt.hour &&
                                 now.minute == runAt.minute) {
                                 submitScheduledJob(entry, jobsDir)
-                                // Disable after firing so it doesn't repeat
                                 ScheduleStore.setEnabled(entry.id, false)
                             }
                         }
                     }
-                    // "rate" schedules are handled by a separate fixed-rate timer below
                 }
             }
         }, 0, 60, TimeUnit.SECONDS)
 
-        // Rate-based schedules: start individual timers
         val rateEntries = ScheduleStore.load().filter { it.enabled && it.type == "rate" && (it.rateMs ?: 0) > 0 }
         for (entry in rateEntries) {
             scheduler.scheduleAtFixedRate({
                 if (!running.get()) return@scheduleAtFixedRate
-                // Re-check enabled in case it was disabled after start
                 if (ScheduleStore.load().any { it.id == entry.id && it.enabled }) {
                     submitScheduledJob(entry, jobsDir)
                 }
@@ -209,7 +202,6 @@ class WorkerCommand : Command() {
 
         fun ack()     { processingFile.delete() }
         fun release() {
-            // Dead-letter after maxRetries: count existing .failed entries for this job base
             val baseName  = originalName.removeSuffix(".json")
             val failCount = failedDir.listFiles { f ->
                 f.name.startsWith(baseName) && f.name.endsWith(".json")
@@ -238,29 +230,34 @@ class WorkerCommand : Command() {
             release(); return
         }
 
+        // Pipeline input — JSON object/array from previous step, or null
+        val inputJson = extractRawJsonValue(jobJson, "input")
+            ?.takeIf { it.isNotBlank() && it != "null" }
+
         val logFile = File(jobsDir, "logs/$queue").also { it.mkdirs() }
             .let { File(it, "$jobId.log") }
 
         println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET} ▶ $jobId  [$queue]  (timeout: ${timeoutSec}s)")
         val startMs = System.currentTimeMillis()
 
+        val cmd = buildList {
+            add(koupperBin); add("run"); add(scriptFile.absolutePath)
+            if (inputJson != null) add(inputJson)
+        }
+
         val proc = runCatching {
-            ProcessBuilder(koupperBin, "run", scriptFile.absolutePath)
-                .redirectErrorStream(true)
-                .start()
+            ProcessBuilder(cmd).redirectErrorStream(true).start()
         }.getOrElse { e ->
             logFile.appendText("[WORKER ERROR] Could not start process: ${e.message}\n")
             release(); return
         }
 
-        // Stream output to log file in a daemon thread
         Thread {
             proc.inputStream.bufferedReader().forEachLine { line ->
                 logFile.appendText("$line\n")
             }
         }.also { it.isDaemon = true }.start()
 
-        // Wait with timeout — isolates the worker from hanging agents
         val finished = proc.waitFor(timeoutSec, TimeUnit.SECONDS)
         val elapsed  = System.currentTimeMillis() - startMs
 
@@ -272,27 +269,48 @@ class WorkerCommand : Command() {
                 release()
             }
             proc.exitValue() == 0 && !logContainsScriptError(logFile) -> {
-                // Extract script return value: last non-empty line before [DONE]
-                val scriptResult = runCatching {
-                    logFile.readLines()
-                        .filter { it.isNotBlank() && !it.startsWith("[DEBUG]") && !it.startsWith("[DONE]") }
-                        .lastOrNull()
-                        ?.replace(Regex("\\[[;\\d]*m"), "")  // strip ANSI
-                        ?.take(500)
-                }.getOrNull()
+                // Prefer [RESULT] <json> sentinel (typed pipeline agents); fall back to last non-blank line
+                val lines = runCatching { logFile.readLines() }.getOrDefault(emptyList())
+                val sentinelJson = lines
+                    .firstOrNull { it.trimStart().startsWith("[RESULT] ") }
+                    ?.substringAfter("[RESULT] ")?.trim()
+
+                val scriptResult = sentinelJson ?: lines
+                    .filter { it.isNotBlank() && !it.startsWith("[DEBUG]") && !it.startsWith("[DONE]") && !it.startsWith("[RESULT]") }
+                    .lastOrNull()
+                    ?.replace(Regex("\\[[;\\d]*m"), "")
+                    ?.take(500)
 
                 logFile.appendText("[DONE] ${elapsed}ms\n")
                 println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} ✓ $jobId  (${elapsed}ms)")
 
-                // Write result file before ack so WebUI watcher can read it
+                // Write result file — raw JSON when sentinel present, escaped string otherwise
                 runCatching {
                     if (!scriptResult.isNullOrBlank()) {
                         val doneDir = File(processingFile.parent, ".done").also { it.mkdirs() }
-                        val escaped = scriptResult.replace("\\", "\\\\").replace("\"", "\\\"")
-                        File(doneDir, "$jobId.result.json")
-                            .writeText("""{"id":"$jobId","result":"$escaped"}""")
+                        val resultJson = if (sentinelJson != null) {
+                            """{"id":"$jobId","result":$sentinelJson}"""
+                        } else {
+                            val escaped = scriptResult.replace("\\", "\\\\").replace("\"", "\\\"")
+                            """{"id":"$jobId","result":"$escaped"}"""
+                        }
+                        File(doneDir, "$jobId.result.json").writeText(resultJson)
                     }
                 }
+
+                // Pipeline dispatch: enqueue next step with this result as input
+                if (sentinelJson != null) {
+                    val pipelineNextStr = extractRawJsonValue(jobJson, "pipelineNext")
+                        ?.takeIf { it.isNotBlank() && it != "null" }
+                    if (pipelineNextStr != null) {
+                        val pipelineId    = extractField(jobJson, "pipelineId") ?: jobId
+                        val pipelineStep  = extractRawJsonValue(jobJson, "pipelineStep")?.toIntOrNull() ?: 0
+                        val pipelineTotal = extractRawJsonValue(jobJson, "pipelineTotal")?.toIntOrNull() ?: 0
+                        val qDir = processingFile.parentFile
+                        dispatchPipelineNext(pipelineNextStr, sentinelJson, pipelineId, pipelineStep + 1, pipelineTotal, qDir)
+                    }
+                }
+
                 ack()
             }
             else -> {
@@ -303,6 +321,33 @@ class WorkerCommand : Command() {
                 release()
             }
         }
+    }
+
+    private fun dispatchPipelineNext(
+        pipelineNextJson: String,
+        input: String,
+        pipelineId: String,
+        nextStep: Int,
+        pipelineTotal: Int,
+        qDir: File
+    ) {
+        val nextScript = extractField(pipelineNextJson, "scriptPath") ?: run {
+            println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ⚠ pipeline $pipelineId step $nextStep: missing scriptPath")
+            return
+        }
+        val nestedNext = extractRawJsonValue(pipelineNextJson, "pipelineNext")
+            ?.takeIf { it.isNotBlank() && it != "null" }
+        val nextJobId = "$pipelineId-step$nextStep"
+
+        val sb = StringBuilder()
+        sb.append("""{"id":"$nextJobId","scriptPath":"$nextScript","input":$input""")
+        sb.append(""","pipelineId":"$pipelineId","pipelineStep":$nextStep""")
+        if (pipelineTotal > 0) sb.append(""","pipelineTotal":$pipelineTotal""")
+        if (nestedNext != null) sb.append(""","pipelineNext":$nestedNext""")
+        sb.append("}")
+
+        File(qDir, "$nextJobId.json").writeText(sb.toString())
+        println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} ⟶ pipeline [$pipelineId] step $nextStep → $nextScript")
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -391,6 +436,51 @@ class WorkerCommand : Command() {
         return sb.toString()
     }
 
+    // Extracts a string field value from flat JSON (existing helper)
     private fun extractField(json: String, field: String): String? =
         Regex(""""$field"\s*:\s*"([^"\\]*)"""").find(json)?.groupValues?.get(1)
+
+    // Extracts a raw JSON value (object, array, null, or number) for a given field.
+    // Returns null if the field is absent. Returns "null" if the field value is JSON null.
+    // For string fields use extractField instead.
+    private fun extractRawJsonValue(json: String, field: String): String? {
+        val keyMatch = Regex(""""$field"\s*:\s*""").find(json) ?: return null
+        var pos = keyMatch.range.last + 1
+        while (pos < json.length && json[pos].isWhitespace()) pos++
+        if (pos >= json.length) return null
+        return when {
+            json.startsWith("null",  pos) -> "null"
+            json.startsWith("true",  pos) -> "true"
+            json.startsWith("false", pos) -> "false"
+            json[pos] == '{' || json[pos] == '[' -> {
+                val open  = json[pos]
+                val close = if (open == '{') '}' else ']'
+                var depth = 0
+                val start = pos
+                var inStr = false
+                var escaped = false
+                while (pos < json.length) {
+                    val c = json[pos]
+                    when {
+                        escaped        -> escaped = false
+                        inStr && c == '\\' -> escaped = true
+                        c == '"'       -> inStr = !inStr
+                        !inStr && c == open  -> depth++
+                        !inStr && c == close -> {
+                            depth--
+                            if (depth == 0) return json.substring(start, pos + 1)
+                        }
+                    }
+                    pos++
+                }
+                null
+            }
+            else -> {
+                // number or other scalar
+                val start = pos
+                while (pos < json.length && json[pos] !in ",}] \n\r\t") pos++
+                json.substring(start, pos).trim().takeIf { it.isNotEmpty() }
+            }
+        }
+    }
 }
