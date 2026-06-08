@@ -17,7 +17,8 @@ import java.util.concurrent.atomic.AtomicInteger
 //
 // Usage: koupper worker [jobsDir] [--queues=q1,q2] [--concurrency=N]
 //                       [--interval=ms] [--timeout=seconds] [--max-retries=N]
-//                       [--enable-scheduling] [--status]
+//                       [--enable-scheduling] [--status] [--retry [queue]]
+//                       [--purge dead|failed [queue]]
 //
 // Defaults:
 //   jobsDir            = ~/.koupper/jobs
@@ -28,6 +29,8 @@ import java.util.concurrent.atomic.AtomicInteger
 //   max-retries        = 3 — moves to .dead/ after N failures on the same job
 //   enable-scheduling  = false (reads ~/.koupper/schedules.json when set)
 //   --status           = print queue snapshot and exit without starting daemon
+//   --retry [queue]    = move all .failed/ jobs back to queue and exit
+//   --purge dead|failed [queue] = delete jobs from .dead/ or .failed/ and exit
 class WorkerCommand : Command() {
 
     override fun name(): String = "worker"
@@ -41,6 +44,19 @@ class WorkerCommand : Command() {
             ?.let { File(it) } ?: File("$home/.koupper/jobs")
 
         if (args.any { it == "--status" }) return statusSnapshot(jobsDir)
+
+        val retryIdx = args.indexOfFirst { it == "--retry" }
+        if (retryIdx >= 0) {
+            val targetQueue = args.getOrNull(retryIdx + 1)?.takeIf { !it.startsWith("--") }
+            return retryFailed(jobsDir, targetQueue)
+        }
+
+        val purgeIdx = args.indexOfFirst { it == "--purge" }
+        if (purgeIdx >= 0) {
+            val bucket      = args.getOrNull(purgeIdx + 1)?.takeIf { !it.startsWith("--") }
+            val targetQueue = args.getOrNull(purgeIdx + 2)?.takeIf { !it.startsWith("--") }
+            return purgeBucket(jobsDir, bucket, targetQueue)
+        }
 
         val queues      = args.firstOrNull { it.startsWith("--queues=") }
             ?.removePrefix("--queues=")?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
@@ -402,6 +418,98 @@ class WorkerCommand : Command() {
                 "Exception in thread \"main\"" in line
             }
         }
+    }
+
+    // ── Retry: move .failed/ → queue ──────────────────────────────────────────
+
+    private fun retryFailed(jobsDir: File, targetQueue: String?): String {
+        val sb = StringBuilder()
+        sb.appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER WORKER RETRY${ANSI_RESET}")
+        if (targetQueue != null) sb.appendLine("  Queue    : $targetQueue")
+        sb.appendLine("  Jobs dir : ${jobsDir.absolutePath}\n")
+
+        if (!jobsDir.exists()) {
+            sb.appendLine("  ${ANSI_YELLOW_229}No jobs directory found.${ANSI_RESET}")
+            return sb.toString()
+        }
+
+        val queues = if (targetQueue != null)
+            listOf(File(jobsDir, targetQueue)).filter { it.isDirectory }
+        else
+            queueDirs(jobsDir, emptyList())
+
+        if (queues.isEmpty()) {
+            sb.appendLine("  No queues found.")
+            return sb.toString()
+        }
+
+        var total = 0
+        queues.forEach { qDir ->
+            val failedDir = File(qDir, ".failed")
+            if (!failedDir.exists()) return@forEach
+            val jobs = failedDir.listFiles { f -> f.name.endsWith(".json") } ?: return@forEach
+            jobs.sortedBy { it.lastModified() }.forEach { file ->
+                val dest = File(qDir, file.name)
+                if (file.renameTo(dest)) {
+                    total++
+                    sb.appendLine("  ${ANSI_GREEN_155}↩${ANSI_RESET}  [${qDir.name}] ${file.name}")
+                } else {
+                    sb.appendLine("  ${ANSI_RED}✗${ANSI_RESET}  [${qDir.name}] ${file.name}  (could not move)")
+                }
+            }
+        }
+
+        if (total == 0) sb.appendLine("  No failed jobs to retry.")
+        else sb.appendLine("\n  ${ANSI_GREEN_155}$total job(s) re-queued.${ANSI_RESET}")
+
+        return sb.toString()
+    }
+
+    // ── Purge: delete jobs from .dead/ or .failed/ ────────────────────────────
+
+    private fun purgeBucket(jobsDir: File, bucket: String?, targetQueue: String?): String {
+        val sb = StringBuilder()
+
+        if (bucket != "dead" && bucket != "failed") {
+            return "\n  Usage: koupper worker --purge dead|failed [queue]\n"
+        }
+
+        sb.appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER WORKER PURGE${ANSI_RESET}  (.$bucket)")
+        if (targetQueue != null) sb.appendLine("  Queue    : $targetQueue")
+        sb.appendLine("  Jobs dir : ${jobsDir.absolutePath}\n")
+
+        if (!jobsDir.exists()) {
+            sb.appendLine("  ${ANSI_YELLOW_229}No jobs directory found.${ANSI_RESET}")
+            return sb.toString()
+        }
+
+        val queues = if (targetQueue != null)
+            listOf(File(jobsDir, targetQueue)).filter { it.isDirectory }
+        else
+            queueDirs(jobsDir, emptyList())
+
+        if (queues.isEmpty()) {
+            sb.appendLine("  No queues found.")
+            return sb.toString()
+        }
+
+        var total = 0
+        queues.forEach { qDir ->
+            val bucketDir = File(qDir, ".$bucket")
+            if (!bucketDir.exists()) return@forEach
+            val jobs = bucketDir.listFiles { f -> f.name.endsWith(".json") } ?: return@forEach
+            jobs.forEach { file ->
+                if (file.delete()) {
+                    total++
+                    sb.appendLine("  ${ANSI_RED}✗${ANSI_RESET}  [${qDir.name}] ${file.name}  deleted")
+                }
+            }
+        }
+
+        if (total == 0) sb.appendLine("  No $bucket jobs to purge.")
+        else sb.appendLine("\n  ${ANSI_GREEN_155}$total job(s) purged from .$bucket.${ANSI_RESET}")
+
+        return sb.toString()
     }
 
     private fun statusSnapshot(jobsDir: File): String {

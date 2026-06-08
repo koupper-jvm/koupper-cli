@@ -8,6 +8,186 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 
+// ── --retry ───────────────────────────────────────────────────────────────────
+
+class WorkerRetryCommandTest {
+
+    private val command = WorkerCommand()
+    private fun tempDir(): File = java.nio.file.Files.createTempDirectory("wc-retry").toFile()
+        .also { it.deleteOnExit() }
+
+    @Test
+    fun `retry on nonexistent jobs dir reports no directory`() {
+        val dir = File(tempDir(), "nonexistent")
+        val out = command.execute("worker", dir.absolutePath, "--retry")
+        assertTrue("No jobs directory" in out)
+    }
+
+    @Test
+    fun `retry with no failed jobs reports nothing to retry`() {
+        val dir = tempDir()
+        File(dir, "default").mkdirs()
+        val out = command.execute("worker", dir.absolutePath, "--retry")
+        assertTrue("No failed jobs" in out)
+    }
+
+    @Test
+    fun `retry moves failed job back to queue`() {
+        val dir   = tempDir()
+        val queue = File(dir, "default").also { it.mkdirs() }
+        val failed = File(queue, ".failed").also { it.mkdirs() }
+        File(failed, "job-001.json").writeText("""{"id":"job-001","retryCount":1}""")
+
+        val out = command.execute("worker", dir.absolutePath, "--retry")
+
+        assertTrue("job-001.json" in out)
+        assertTrue("re-queued" in out)
+        assertTrue(File(queue, "job-001.json").exists())
+        assertFalse(File(failed, "job-001.json").exists())
+    }
+
+    @Test
+    fun `retry counts all moved jobs across queues`() {
+        val dir = tempDir()
+        listOf("alpha", "beta").forEach { name ->
+            val q = File(dir, name).also { it.mkdirs() }
+            val f = File(q, ".failed").also { it.mkdirs() }
+            File(f, "job-$name.json").writeText("{}")
+        }
+
+        val out = command.execute("worker", dir.absolutePath, "--retry")
+        assertTrue("2 job(s) re-queued" in out)
+    }
+
+    @Test
+    fun `retry with target queue only retries that queue`() {
+        val dir   = tempDir()
+        val alpha = File(dir, "alpha").also { it.mkdirs() }
+        val beta  = File(dir, "beta").also  { it.mkdirs() }
+        File(alpha, ".failed").also { it.mkdirs() }.let { File(it, "a.json").writeText("{}") }
+        File(beta,  ".failed").also { it.mkdirs() }.let { File(it, "b.json").writeText("{}") }
+
+        command.execute("worker", dir.absolutePath, "--retry", "alpha")
+
+        assertTrue(File(alpha, "a.json").exists())   // moved back
+        assertFalse(File(beta, "b.json").exists().also {}) // beta untouched
+        assertTrue(File(File(beta, ".failed"), "b.json").exists())
+    }
+
+    @Test
+    fun `retry output shows header`() {
+        val dir = tempDir()
+        File(dir, "default").mkdirs()
+        val out = command.execute("worker", dir.absolutePath, "--retry")
+        assertTrue("RETRY" in out)
+    }
+}
+
+// ── --purge ───────────────────────────────────────────────────────────────────
+
+class WorkerPurgeCommandTest {
+
+    private val command = WorkerCommand()
+    private fun tempDir(): File = java.nio.file.Files.createTempDirectory("wc-purge").toFile()
+        .also { it.deleteOnExit() }
+
+    @Test
+    fun `purge without bucket shows usage`() {
+        val dir = tempDir()
+        val out = command.execute("worker", dir.absolutePath, "--purge")
+        assertTrue("Usage" in out || "dead|failed" in out)
+    }
+
+    @Test
+    fun `purge with invalid bucket shows usage`() {
+        val dir = tempDir()
+        val out = command.execute("worker", dir.absolutePath, "--purge", "pending")
+        assertTrue("dead|failed" in out)
+    }
+
+    @Test
+    fun `purge dead deletes files from dead bucket`() {
+        val dir   = tempDir()
+        val queue = File(dir, "default").also { it.mkdirs() }
+        val dead  = File(queue, ".dead").also  { it.mkdirs() }
+        File(dead, "job-dead.json").writeText("{}")
+
+        val out = command.execute("worker", dir.absolutePath, "--purge", "dead")
+
+        assertTrue("1 job(s) purged" in out)
+        assertFalse(File(dead, "job-dead.json").exists())
+    }
+
+    @Test
+    fun `purge failed deletes files from failed bucket`() {
+        val dir   = tempDir()
+        val queue = File(dir, "default").also { it.mkdirs() }
+        val failed = File(queue, ".failed").also { it.mkdirs() }
+        File(failed, "job-bad.json").writeText("{}")
+
+        val out = command.execute("worker", dir.absolutePath, "--purge", "failed")
+
+        assertTrue("1 job(s) purged" in out)
+        assertFalse(File(failed, "job-bad.json").exists())
+    }
+
+    @Test
+    fun `purge dead across multiple queues deletes all`() {
+        val dir = tempDir()
+        listOf("alpha", "beta").forEach { name ->
+            val q = File(dir, name).also { it.mkdirs() }
+            val d = File(q, ".dead").also { it.mkdirs() }
+            File(d, "job-$name.json").writeText("{}")
+        }
+
+        val out = command.execute("worker", dir.absolutePath, "--purge", "dead")
+        assertTrue("2 job(s) purged" in out)
+    }
+
+    @Test
+    fun `purge with target queue only purges that queue`() {
+        val dir   = tempDir()
+        val alpha = File(dir, "alpha").also { it.mkdirs() }
+        val beta  = File(dir, "beta").also  { it.mkdirs() }
+        File(alpha, ".dead").also { it.mkdirs() }.let { File(it, "a.json").writeText("{}") }
+        File(beta,  ".dead").also { it.mkdirs() }.let { File(it, "b.json").writeText("{}") }
+
+        command.execute("worker", dir.absolutePath, "--purge", "dead", "alpha")
+
+        assertFalse(File(File(alpha, ".dead"), "a.json").exists())
+        assertTrue(File(File(beta,  ".dead"), "b.json").exists())
+    }
+
+    @Test
+    fun `purge with empty bucket reports nothing to purge`() {
+        val dir = tempDir()
+        File(dir, "default").mkdirs()
+        val out = command.execute("worker", dir.absolutePath, "--purge", "dead")
+        assertTrue("No dead jobs" in out)
+    }
+
+    @Test
+    fun `purge on nonexistent jobs dir reports no directory`() {
+        val dir = File(tempDir(), "nonexistent")
+        val out = command.execute("worker", dir.absolutePath, "--purge", "dead")
+        assertTrue("No jobs directory" in out)
+    }
+
+    @Test
+    fun `purge does not delete non-json files`() {
+        val dir   = tempDir()
+        val queue = File(dir, "default").also { it.mkdirs() }
+        val dead  = File(queue, ".dead").also  { it.mkdirs() }
+        File(dead, "job.json").writeText("{}")
+        File(dead, "notes.txt").writeText("keep me")
+
+        command.execute("worker", dir.absolutePath, "--purge", "dead")
+
+        assertFalse(File(dead, "job.json").exists())
+        assertTrue(File(dead, "notes.txt").exists())
+    }
+}
+
 // ── updateRetryCount ─────────────────────────────────────────────────────────
 
 class UpdateRetryCountTest {
