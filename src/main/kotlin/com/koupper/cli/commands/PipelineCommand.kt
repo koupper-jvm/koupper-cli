@@ -6,9 +6,10 @@ import com.koupper.cli.ANSIColors.ANSI_RESET
 import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
 import java.io.File
 
-// Submits and tracks multi-step pipelines without writing a .kts script.
+// Submits, tracks, and scaffolds multi-step pipelines without writing a .kts script.
 //
 // Usage:
+//   koupper pipeline new    <name>          [--steps=N] [--queue=<queue>]
 //   koupper pipeline submit <pipeline.json> [--jobs-dir=path]
 //   koupper pipeline status <pipelineId>    [--jobs-dir=path]
 //
@@ -40,6 +41,15 @@ class PipelineCommand : Command() {
             ?: File("$home/.koupper/jobs")
 
         return when (subcommand) {
+            "new" -> {
+                val name = positionals.getOrNull(1)
+                    ?: return "\n  ${ANSI_RED}Error: pipeline name required${ANSI_RESET}\n  Usage: koupper pipeline new <name> [--steps=N] [--queue=<queue>]\n"
+                val stepsCount = args.firstOrNull { it.startsWith("--steps=") }
+                    ?.removePrefix("--steps=")?.toIntOrNull()?.coerceAtLeast(1) ?: 2
+                val queue = args.firstOrNull { it.startsWith("--queue=") }
+                    ?.removePrefix("--queue=") ?: "default"
+                scaffoldPipeline(name, stepsCount, queue, File(args[0]))
+            }
             "submit" -> {
                 val path = positionals.getOrNull(1)
                     ?: return "\n  ${ANSI_RED}Error: pipeline file path required${ANSI_RESET}\n  Usage: koupper pipeline submit <pipeline.json>\n"
@@ -52,6 +62,63 @@ class PipelineCommand : Command() {
                 statusPipeline(pipelineId, jobsDir)
             }
             else -> usage()
+        }
+    }
+
+    // ── New (scaffold) ───────────────────────────────────────────────────────
+
+    private fun scaffoldPipeline(name: String, stepsCount: Int, queue: String, baseDir: File): String {
+        val pipelineDir = File(baseDir, name)
+        if (pipelineDir.exists()) {
+            return "\n  ${ANSI_RED}Error: '${pipelineDir.absolutePath}' already exists${ANSI_RESET}\n"
+        }
+
+        val agentsDir = File(pipelineDir, "agents")
+        agentsDir.mkdirs()
+
+        val stepNames = (1..stepsCount).map { "Step$it" }
+
+        val stepsJson = stepNames.mapIndexed { i, stepName ->
+            val inputPart = if (i == 0) """, "input": {}""" else ""
+            """    {"agent": "agents/$stepName.kts"$inputPart}"""
+        }.joinToString(",\n")
+
+        val pipelineJson = buildString {
+            appendLine("{")
+            appendLine("""  "id": "$name",""")
+            appendLine("""  "queue": "$queue",""")
+            appendLine("""  "steps": [""")
+            append(stepsJson)
+            appendLine()
+            appendLine("  ]")
+            append("}")
+        }
+        File(pipelineDir, "pipeline.json").writeText(pipelineJson)
+
+        stepNames.forEach { stepName ->
+            val stub = buildString {
+                appendLine("@Export")
+                appendLine("fun setup() {")
+                appendLine("    // TODO: implement $stepName logic")
+                appendLine()
+                appendLine("""    println("[RESULT] {}")""")
+                append("}")
+            }
+            File(agentsDir, "$stepName.kts").writeText(stub)
+        }
+
+        return buildString {
+            appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER PIPELINE NEW${ANSI_RESET}")
+            appendLine()
+            appendLine("  Created  : ${pipelineDir.absolutePath}")
+            appendLine("  Pipeline : $name")
+            appendLine("  Queue    : $queue")
+            appendLine("  Steps    : $stepsCount")
+            appendLine()
+            appendLine("  ${ANSI_GREEN_155}✓${ANSI_RESET}  pipeline.json")
+            stepNames.forEach { appendLine("  ${ANSI_GREEN_155}✓${ANSI_RESET}  agents/$it.kts") }
+            appendLine()
+            append("  Next: ${ANSI_YELLOW_229}koupper pipeline submit $name/pipeline.json${ANSI_RESET}")
         }
     }
 
@@ -222,17 +289,18 @@ class PipelineCommand : Command() {
         appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER PIPELINE${ANSI_RESET}")
         appendLine()
         appendLine("  Subcommands:")
-        appendLine("    submit <pipeline.json> [--jobs-dir=path]   Enqueue a multi-step pipeline")
-        appendLine("    status <pipelineId>    [--jobs-dir=path]   Show pipeline step progress")
+        appendLine("    new    <name>          [--steps=N] [--queue=<queue>]   Scaffold pipeline directory + agent stubs")
+        appendLine("    submit <pipeline.json> [--jobs-dir=path]               Enqueue a multi-step pipeline")
+        appendLine("    status <pipelineId>    [--jobs-dir=path]               Show pipeline step progress")
         appendLine()
         appendLine("  Pipeline file format (pipeline.json):")
         appendLine("    {")
         appendLine("""      "id":    "my-pipeline",""")
         appendLine("""      "queue": "default",""")
         appendLine("      \"steps\": [")
-        appendLine("""        { "agent": "agents/Step1Agent.kts", "input": {"key": "value"} },""")
-        appendLine("""        { "agent": "agents/Step2Agent.kts" },""")
-        appendLine("""        { "agent": "agents/Step3Agent.kts" }""")
+        appendLine("""        { "agent": "agents/Step1.kts", "input": {"key": "value"} },""")
+        appendLine("""        { "agent": "agents/Step2.kts" },""")
+        appendLine("""        { "agent": "agents/Step3.kts" }""")
         appendLine("      ]")
         appendLine("    }")
         appendLine()

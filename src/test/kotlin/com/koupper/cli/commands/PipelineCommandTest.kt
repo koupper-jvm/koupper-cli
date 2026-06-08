@@ -330,6 +330,99 @@ class PipelineStatusTest {
     }
 }
 
+// ── PipelineCommand new (scaffold) ───────────────────────────────────────────
+
+class PipelineNewTest {
+
+    private val command = PipelineCommand()
+    private fun tempDir(): File = Files.createTempDirectory("pipe-new").toFile().also { it.deleteOnExit() }
+
+    @Test
+    fun `creates pipeline directory`() {
+        val dir = tempDir()
+        command.execute(dir.absolutePath, "new", "my-pipe")
+        assertTrue(File(dir, "my-pipe").isDirectory)
+    }
+
+    @Test
+    fun `creates pipeline json`() {
+        val dir = tempDir()
+        command.execute(dir.absolutePath, "new", "my-pipe")
+        val json = File(dir, "my-pipe/pipeline.json")
+        assertTrue(json.exists())
+        val content = json.readText()
+        assertTrue(""""id": "my-pipe"""" in content)
+        assertTrue(""""queue": "default"""" in content)
+        assertTrue(""""steps"""" in content)
+    }
+
+    @Test
+    fun `creates two agent stubs by default`() {
+        val dir = tempDir()
+        command.execute(dir.absolutePath, "new", "my-pipe")
+        assertTrue(File(dir, "my-pipe/agents/Step1.kts").exists())
+        assertTrue(File(dir, "my-pipe/agents/Step2.kts").exists())
+    }
+
+    @Test
+    fun `respects custom step count`() {
+        val dir = tempDir()
+        command.execute(dir.absolutePath, "new", "multi", "--steps=4")
+        for (i in 1..4) assertTrue(File(dir, "multi/agents/Step$i.kts").exists())
+        assertFalse(File(dir, "multi/agents/Step5.kts").exists())
+    }
+
+    @Test
+    fun `respects custom queue`() {
+        val dir = tempDir()
+        command.execute(dir.absolutePath, "new", "q-pipe", "--queue=priority")
+        val content = File(dir, "q-pipe/pipeline.json").readText()
+        assertTrue(""""queue": "priority"""" in content)
+    }
+
+    @Test
+    fun `agent stubs contain Export annotation and RESULT sentinel`() {
+        val dir = tempDir()
+        command.execute(dir.absolutePath, "new", "my-pipe")
+        val stub = File(dir, "my-pipe/agents/Step1.kts").readText()
+        assertTrue("@Export" in stub)
+        assertTrue("[RESULT]" in stub)
+    }
+
+    @Test
+    fun `first step has input field in pipeline json`() {
+        val dir = tempDir()
+        command.execute(dir.absolutePath, "new", "my-pipe")
+        val content = File(dir, "my-pipe/pipeline.json").readText()
+        assertTrue(""""input": {}""" in content)
+    }
+
+    @Test
+    fun `returns error when directory already exists`() {
+        val dir = tempDir()
+        File(dir, "existing").mkdirs()
+        val out = command.execute(dir.absolutePath, "new", "existing")
+        assertTrue("already exists" in out.lowercase())
+    }
+
+    @Test
+    fun `output confirms created files`() {
+        val dir = tempDir()
+        val out = command.execute(dir.absolutePath, "new", "my-pipe")
+        assertTrue("pipeline.json" in out)
+        assertTrue("Step1.kts" in out)
+        assertTrue("Step2.kts" in out)
+    }
+
+    @Test
+    fun `output suggests submit command`() {
+        val dir = tempDir()
+        val out = command.execute(dir.absolutePath, "new", "my-pipe")
+        assertTrue("submit" in out)
+        assertTrue("my-pipe" in out)
+    }
+}
+
 // ── PipelineCommand routing ───────────────────────────────────────────────────
 
 class PipelineCommandRoutingTest {
@@ -358,5 +451,17 @@ class PipelineCommandRoutingTest {
     fun `status without id returns error`() {
         val out = command.execute("pipeline", "status")
         assertTrue("required" in out.lowercase())
+    }
+
+    @Test
+    fun `new without name returns error`() {
+        val out = command.execute("pipeline", "new")
+        assertTrue("required" in out.lowercase())
+    }
+
+    @Test
+    fun `usage includes new subcommand`() {
+        val out = command.execute("pipeline")
+        assertTrue("new" in out)
     }
 }
