@@ -234,10 +234,22 @@ class WorkerCommand : Command() {
         val inputJson = extractRawJsonValue(jobJson, "input")
             ?.takeIf { it.isNotBlank() && it != "null" }
 
+        // Per-job env vars — {"KEY": "value"} object in job JSON
+        val envOverrides: Map<String, String> = runCatching {
+            val envRaw = extractRawJsonValue(jobJson, "env")
+                ?.takeIf { it.startsWith("{") } ?: return@runCatching emptyMap()
+            // Parse flat {"KEY":"value"} without Jackson dependency
+            val result = mutableMapOf<String, String>()
+            val kvPattern = Regex(""""([^"]+)"\s*:\s*"([^"\\]*)"""")
+            kvPattern.findAll(envRaw).forEach { m -> result[m.groupValues[1]] = m.groupValues[2] }
+            result
+        }.getOrDefault(emptyMap())
+
         val logFile = File(jobsDir, "logs/$queue").also { it.mkdirs() }
             .let { File(it, "$jobId.log") }
 
         println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET} ▶ $jobId  [$queue]  (timeout: ${timeoutSec}s)")
+        if (envOverrides.isNotEmpty()) println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET}   env: ${envOverrides.keys.joinToString()}")
         val startMs = System.currentTimeMillis()
 
         val cmd = buildList {
@@ -246,7 +258,9 @@ class WorkerCommand : Command() {
         }
 
         val proc = runCatching {
-            ProcessBuilder(cmd).redirectErrorStream(true).start()
+            val pb = ProcessBuilder(cmd).redirectErrorStream(true)
+            if (envOverrides.isNotEmpty()) pb.environment().putAll(envOverrides)
+            pb.start()
         }.getOrElse { e ->
             logFile.appendText("[WORKER ERROR] Could not start process: ${e.message}\n")
             release(); return
@@ -436,51 +450,51 @@ class WorkerCommand : Command() {
         return sb.toString()
     }
 
-    // Extracts a string field value from flat JSON (existing helper)
-    private fun extractField(json: String, field: String): String? =
-        Regex(""""$field"\s*:\s*"([^"\\]*)"""").find(json)?.groupValues?.get(1)
+}
 
-    // Extracts a raw JSON value (object, array, null, or number) for a given field.
-    // Returns null if the field is absent. Returns "null" if the field value is JSON null.
-    // For string fields use extractField instead.
-    private fun extractRawJsonValue(json: String, field: String): String? {
-        val keyMatch = Regex(""""$field"\s*:\s*""").find(json) ?: return null
-        var pos = keyMatch.range.last + 1
-        while (pos < json.length && json[pos].isWhitespace()) pos++
-        if (pos >= json.length) return null
-        return when {
-            json.startsWith("null",  pos) -> "null"
-            json.startsWith("true",  pos) -> "true"
-            json.startsWith("false", pos) -> "false"
-            json[pos] == '{' || json[pos] == '[' -> {
-                val open  = json[pos]
-                val close = if (open == '{') '}' else ']'
-                var depth = 0
-                val start = pos
-                var inStr = false
-                var escaped = false
-                while (pos < json.length) {
-                    val c = json[pos]
-                    when {
-                        escaped        -> escaped = false
-                        inStr && c == '\\' -> escaped = true
-                        c == '"'       -> inStr = !inStr
-                        !inStr && c == open  -> depth++
-                        !inStr && c == close -> {
-                            depth--
-                            if (depth == 0) return json.substring(start, pos + 1)
-                        }
+// Extracts a quoted string field value from a flat JSON object.
+internal fun extractField(json: String, field: String): String? =
+    Regex(""""$field"\s*:\s*"([^"\\]*)"""").find(json)?.groupValues?.get(1)
+
+// Extracts a raw JSON value (object, array, boolean, null, or number) for a field.
+// Returns null if the field is absent. Returns the string "null" if the JSON value is null.
+// For quoted string fields use extractField instead.
+internal fun extractRawJsonValue(json: String, field: String): String? {
+    val keyMatch = Regex(""""$field"\s*:\s*""").find(json) ?: return null
+    var pos = keyMatch.range.last + 1
+    while (pos < json.length && json[pos].isWhitespace()) pos++
+    if (pos >= json.length) return null
+    return when {
+        json.startsWith("null",  pos) -> "null"
+        json.startsWith("true",  pos) -> "true"
+        json.startsWith("false", pos) -> "false"
+        json[pos] == '{' || json[pos] == '[' -> {
+            val open  = json[pos]
+            val close = if (open == '{') '}' else ']'
+            var depth = 0
+            val start = pos
+            var inStr = false
+            var escaped = false
+            while (pos < json.length) {
+                val c = json[pos]
+                when {
+                    escaped            -> escaped = false
+                    inStr && c == '\\' -> escaped = true
+                    c == '"'           -> inStr = !inStr
+                    !inStr && c == open  -> depth++
+                    !inStr && c == close -> {
+                        depth--
+                        if (depth == 0) return json.substring(start, pos + 1)
                     }
-                    pos++
                 }
-                null
+                pos++
             }
-            else -> {
-                // number or other scalar
-                val start = pos
-                while (pos < json.length && json[pos] !in ",}] \n\r\t") pos++
-                json.substring(start, pos).trim().takeIf { it.isNotEmpty() }
-            }
+            null
+        }
+        else -> {
+            val start = pos
+            while (pos < json.length && json[pos] !in ",}] \n\r\t") pos++
+            json.substring(start, pos).trim().takeIf { it.isNotEmpty() }
         }
     }
 }
