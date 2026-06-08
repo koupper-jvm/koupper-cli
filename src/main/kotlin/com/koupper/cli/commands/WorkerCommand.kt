@@ -165,8 +165,9 @@ class WorkerCommand : Command() {
     private fun submitScheduledJob(entry: ScheduleEntry, jobsDir: File) {
         val jobId = "${entry.agent}-sched-${System.currentTimeMillis()}"
         val qDir  = File(jobsDir, entry.queue).also { it.mkdirs() }
+        val inputFragment = if (entry.input != null) ""","input":${entry.input}""" else ""
         File(qDir, "$jobId.json").writeText(
-            """{"id":"$jobId","fileName":"${entry.agent}","functionName":"run","scriptPath":"agents/${entry.agent}.kts","sourceType":"script","scheduledBy":"${entry.id}","submittedAt":"${LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))}"}"""
+            """{"id":"$jobId","fileName":"${entry.agent}","functionName":"run","scriptPath":"agents/${entry.agent}.kts","sourceType":"script","scheduledBy":"${entry.id}","submittedAt":"${LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))}"$inputFragment}"""
         )
         println("  ${ANSI_YELLOW_229}[SCHEDULER]${ANSI_RESET} ⏰ ${entry.id} → $jobId [${entry.queue}]")
     }
