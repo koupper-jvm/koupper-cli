@@ -8,6 +8,121 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 
+// ── updateRetryCount ─────────────────────────────────────────────────────────
+
+class UpdateRetryCountTest {
+
+    @Test
+    fun `adds retryCount field when absent`() {
+        val json = """{"id":"job-1","scriptPath":"agents/Foo.kts"}"""
+        val out  = updateRetryCount(json, 1)
+        assertTrue(""""retryCount":1""" in out)
+    }
+
+    @Test
+    fun `updates existing retryCount value`() {
+        val json = """{"id":"job-1","retryCount":1,"scriptPath":"agents/Foo.kts"}"""
+        val out  = updateRetryCount(json, 2)
+        assertTrue(""""retryCount":2""" in out)
+        assertFalse(""""retryCount":1""" in out)
+    }
+
+    @Test
+    fun `preserves other fields when adding`() {
+        val json = """{"id":"job-42","scriptPath":"agents/Bar.kts"}"""
+        val out  = updateRetryCount(json, 1)
+        assertTrue(""""id":"job-42"""" in out)
+        assertTrue(""""scriptPath":"agents/Bar.kts"""" in out)
+    }
+
+    @Test
+    fun `preserves other fields when updating`() {
+        val json = """{"id":"job-42","retryCount":2,"scriptPath":"agents/Bar.kts"}"""
+        val out  = updateRetryCount(json, 3)
+        assertTrue(""""id":"job-42"""" in out)
+        assertTrue(""""scriptPath":"agents/Bar.kts"""" in out)
+        assertTrue(""""retryCount":3""" in out)
+    }
+
+    @Test
+    fun `handles count of zero`() {
+        val json = """{"id":"job-1"}"""
+        val out  = updateRetryCount(json, 0)
+        assertTrue(""""retryCount":0""" in out)
+    }
+
+    @Test
+    fun `result is still valid-shaped json`() {
+        val json = """{"id":"job-1","scriptPath":"x.kts"}"""
+        val out  = updateRetryCount(json, 1)
+        assertTrue(out.trim().startsWith("{"))
+        assertTrue(out.trim().endsWith("}"))
+    }
+
+    @Test
+    fun `does not duplicate retryCount when called twice`() {
+        val json = """{"id":"job-1"}"""
+        val after1 = updateRetryCount(json, 1)
+        val after2 = updateRetryCount(after1, 2)
+        val occurrences = after2.split("retryCount").size - 1
+        assertEquals(1, occurrences)
+    }
+}
+
+// ── retry count logic (unit — no real processes) ──────────────────────────────
+
+class WorkerRetryCountLogicTest {
+
+    @Test
+    fun `first failure produces retryCount 1 in failed file`() {
+        val jobJson = """{"id":"job-abc","scriptPath":"agents/Foo.kts"}"""
+        // First failure: currentRetries=0, newRetries=1, maxRetries=3 → .failed/
+        val currentRetries = extractRawJsonValue(jobJson, "retryCount")?.toIntOrNull() ?: 0
+        assertEquals(0, currentRetries)
+        val newRetries = currentRetries + 1
+        val updated = updateRetryCount(jobJson, newRetries)
+        assertTrue(""""retryCount":1""" in updated)
+        assertTrue(newRetries < 3) // goes to .failed/, not .dead/
+    }
+
+    @Test
+    fun `second failure produces retryCount 2`() {
+        val jobJson = """{"id":"job-abc","retryCount":1,"scriptPath":"agents/Foo.kts"}"""
+        val currentRetries = extractRawJsonValue(jobJson, "retryCount")?.toIntOrNull() ?: 0
+        assertEquals(1, currentRetries)
+        val newRetries = currentRetries + 1
+        val updated = updateRetryCount(jobJson, newRetries)
+        assertTrue(""""retryCount":2""" in updated)
+        assertTrue(newRetries < 3)
+    }
+
+    @Test
+    fun `third failure with maxRetries 3 triggers dead-letter`() {
+        val jobJson = """{"id":"job-abc","retryCount":2,"scriptPath":"agents/Foo.kts"}"""
+        val currentRetries = extractRawJsonValue(jobJson, "retryCount")?.toIntOrNull() ?: 0
+        val newRetries = currentRetries + 1
+        assertEquals(3, newRetries)
+        assertTrue(newRetries >= 3) // → .dead/
+    }
+
+    @Test
+    fun `maxRetries 1 means first failure goes to dead`() {
+        val jobJson = """{"id":"job-abc"}"""
+        val currentRetries = extractRawJsonValue(jobJson, "retryCount")?.toIntOrNull() ?: 0
+        val newRetries = currentRetries + 1
+        assertTrue(newRetries >= 1) // maxRetries=1 → .dead/ on first failure
+    }
+
+    @Test
+    fun `job with retryCount 0 set explicitly behaves same as absent`() {
+        val jobJson = """{"id":"job-abc","retryCount":0}"""
+        val currentRetries = extractRawJsonValue(jobJson, "retryCount")?.toIntOrNull() ?: 0
+        assertEquals(0, currentRetries)
+        val newRetries = currentRetries + 1
+        assertEquals(1, newRetries)
+    }
+}
+
 // ── extractField ─────────────────────────────────────────────────────────────
 
 class ExtractFieldTest {

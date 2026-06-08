@@ -200,22 +200,32 @@ class WorkerCommand : Command() {
     ) {
         val jobId = processingFile.name.removeSuffix(".json.processing")
 
+        // Mutable so release() captures it; assigned immediately after read.
+        // When the read fails (file unreadable), jobJson stays "" → retryCount treated as 0.
+        var jobJson = ""
+
         fun ack()     { processingFile.delete() }
         fun release() {
-            val baseName  = originalName.removeSuffix(".json")
-            val failCount = failedDir.listFiles { f ->
-                f.name.startsWith(baseName) && f.name.endsWith(".json")
-            }?.size ?: 0
-
-            if (failCount >= maxRetries) {
+            if (jobJson.isBlank()) {
                 processingFile.renameTo(File(deadDir, originalName))
-                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ☠ $jobId → .dead/ (exceeded $maxRetries retries)")
+                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ☠ $jobId → .dead/ (unreadable job file)")
+                return
+            }
+            val currentRetries = extractRawJsonValue(jobJson, "retryCount")?.toIntOrNull() ?: 0
+            val newRetries = currentRetries + 1
+
+            if (newRetries >= maxRetries) {
+                processingFile.renameTo(File(deadDir, originalName))
+                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ☠ $jobId → .dead/ ($newRetries/$maxRetries retries)")
             } else {
-                processingFile.renameTo(File(failedDir, originalName))
+                val updatedJson = updateRetryCount(jobJson, newRetries)
+                File(failedDir, originalName).writeText(updatedJson)
+                processingFile.delete()
+                println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET} ↩ $jobId → .failed/ (retry $newRetries/$maxRetries)")
             }
         }
 
-        val jobJson = runCatching { processingFile.readText() }.getOrElse { e ->
+        jobJson = runCatching { processingFile.readText() }.getOrElse { e ->
             println("  ${ANSI_RED}[WORKER] ERROR reading $jobId: ${e.message}${ANSI_RESET}")
             release(); return
         }
@@ -450,6 +460,16 @@ class WorkerCommand : Command() {
         return sb.toString()
     }
 
+}
+
+// Embeds or updates the retryCount field in a job JSON string.
+// Appends the field before the closing brace when not present.
+internal fun updateRetryCount(json: String, count: Int): String {
+    val pattern = Regex(""""retryCount"\s*:\s*\d+""")
+    if (pattern.containsMatchIn(json)) return pattern.replace(json, """"retryCount":$count""")
+    val trimmed = json.trim()
+    return if (trimmed.endsWith("}")) trimmed.dropLast(1) + ""","retryCount":$count}"""
+    else json
 }
 
 // Extracts a quoted string field value from a flat JSON object.
