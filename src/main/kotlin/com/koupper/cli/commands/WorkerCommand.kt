@@ -300,14 +300,15 @@ class WorkerCommand : Command() {
             release(); return
         }
 
-        Thread {
+        val readerThread = Thread {
             proc.inputStream.bufferedReader().forEachLine { line ->
                 logFile.appendText("$line\n")
             }
-        }.also { it.isDaemon = true }.start()
+        }.also { it.isDaemon = true; it.start() }
 
         val finished = proc.waitFor(timeoutSec, TimeUnit.SECONDS)
         val elapsed  = System.currentTimeMillis() - startMs
+        readerThread.join(5_000)
 
         when {
             !finished -> {
@@ -332,18 +333,35 @@ class WorkerCommand : Command() {
                 logFile.appendText("[DONE] ${elapsed}ms\n")
                 println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} ✓ $jobId  (${elapsed}ms)")
 
-                // Write result file — raw JSON when sentinel present, escaped string otherwise
+                // Write result file — includes provenance fields so the dashboard can show schema/envVars
                 runCatching {
-                    if (!scriptResult.isNullOrBlank()) {
-                        val doneDir = File(processingFile.parent, ".done").also { it.mkdirs() }
-                        val resultJson = if (sentinelJson != null) {
-                            """{"id":"$jobId","result":$sentinelJson}"""
-                        } else {
+                    val doneDir = File(processingFile.parent, ".done").also { it.mkdirs() }
+                    val fileNameField = extractField(jobJson, "fileName")
+                        ?: extractField(jobJson, "scriptPath")?.let { java.io.File(it).nameWithoutExtension }
+                        ?: ""
+                    val scriptPathField  = extractField(jobJson, "scriptPath") ?: ""
+                    val submittedAtField = extractField(jobJson, "submittedAt") ?: ""
+                    val inputRaw         = extractRawJsonValue(jobJson, "input")
+                        ?.takeIf { it.isNotBlank() && it != "null" }
+
+                    val completedAt = java.time.Instant.now().toString()
+
+                    val resultJson = buildString {
+                        append("""{"id":"$jobId"""")
+                        if (fileNameField.isNotBlank())    append(""","fileName":"$fileNameField"""")
+                        if (scriptPathField.isNotBlank())  append(""","scriptPath":"$scriptPathField"""")
+                        if (submittedAtField.isNotBlank()) append(""","submittedAt":"$submittedAtField"""")
+                        append(""","completedAt":"$completedAt"""")
+                        if (inputRaw != null)              append(""","input":$inputRaw""")
+                        if (sentinelJson != null) {
+                            append(""","result":$sentinelJson""")
+                        } else if (!scriptResult.isNullOrBlank()) {
                             val escaped = scriptResult.replace("\\", "\\\\").replace("\"", "\\\"")
-                            """{"id":"$jobId","result":"$escaped"}"""
+                            append(""","result":"$escaped"""")
                         }
-                        File(doneDir, "$jobId.result.json").writeText(resultJson)
+                        append("}")
                     }
+                    File(doneDir, "$jobId.result.json").writeText(resultJson)
                 }
 
                 // Pipeline dispatch: enqueue next step with this result as input
