@@ -9,9 +9,9 @@ import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
 // The worker daemon reads this file and enqueues jobs at the right time.
 //
 // Usage:
-//   koupper schedule add <agent> --cron="0 8 * * *" [--id=name] [--queue=q] [--input='{}']
-//   koupper schedule add <agent> --rate=3600000       [--id=name] [--queue=q] [--input='{}']
-//   koupper schedule add <agent> --once="2026-06-01T08:00:00" [--queue=q] [--input='{}']
+//   koupper schedule add <agent> --cron="0 8 * * *" [--id=name] [--queue=q]
+//   koupper schedule add <agent> --rate=3600000       [--id=name] [--queue=q]
+//   koupper schedule add <agent> --once="2026-06-01T08:00:00" [--queue=q]
 //   koupper schedule list
 //   koupper schedule remove <id>
 //   koupper schedule enable  <id>
@@ -43,7 +43,6 @@ class ScheduleCommand : Command() {
         val runAt   = flag(args, "--once")
         val queue   = flag(args, "--queue") ?: "default"
         val id      = flag(args, "--id") ?: "$agent-${System.currentTimeMillis() % 100000}"
-        val input   = flag(args, "--input")
 
         val (type, valid, hint) = when {
             cron   != null -> Triple("cron",  true,  "")
@@ -60,8 +59,7 @@ class ScheduleCommand : Command() {
             type   = type,
             cron   = cron,
             rateMs = rateMs,
-            runAt  = runAt,
-            input  = input
+            runAt  = runAt
         )
         ScheduleStore.add(entry)
 
@@ -134,9 +132,8 @@ class ScheduleCommand : Command() {
     disable <id>                       Disable without removing
 
   ${ANSI_GREEN_155}Options:${ANSI_RESET}
-    --id=<name>      Custom schedule ID (default: agent-timestamp)
-    --queue=<q>      Target queue (default: default)
-    --input=<json>   JSON input forwarded to the agent on every run
+    --id=<name>    Custom schedule ID (default: agent-timestamp)
+    --queue=<q>    Target queue (default: default)
 
   ${ANSI_GREEN_155}Examples:${ANSI_RESET}
     koupper schedule add DataAgent --cron="0 8 * * 1-5" --id=daily-data

@@ -15,17 +15,16 @@ object AvailableCommands {
     const val PROVIDER = "provider"
     const val INFRA = "infra"
     const val RECONCILE = "reconcile"
-    const val START    = "start"
-    const val MONITOR  = "monitor"
     const val WORKER   = "worker"
     const val SCHEDULE = "schedule"
     const val DOCTOR   = "doctor"
     const val AGENT    = "agent"
-    const val PIPELINE = "pipeline"
+    const val WATCH    = "watch"
 
     fun commands(): Map<String, String> = mapOf(
         NEW to "Creates a module or script",
         RUN to "Runs a kotlin script",
+        WATCH to "Watch a project and manage dependencies automatically via Octopus Sentinel",
         DEPLOY to "Deploys a .kts script to a remote Octopus daemon",
         HELP to "Displays information about a command",
         MODULE to "Analyzes and inspects existing modules and their structure.",
@@ -33,12 +32,9 @@ object AvailableCommands {
         PROVIDER to "Lists available service providers and environment requirements",
         INFRA to "Runs Terraform-based infrastructure lifecycle commands",
         RECONCILE to "Orchestrates infra/preflight/deploy/smoke/rollback pipelines",
-        START    to "Start the full CORTEX stack: worker + web UI + monitor in one command",
-        MONITOR  to "Launches the IGLY CORTEX real-time swarm dashboard",
         WORKER   to "Starts a job worker daemon that executes agent scripts from the queue",
         SCHEDULE to "Manage recurring agent schedules (cron, rate, once)",
         DOCTOR   to "Diagnose the Koupper runtime: env vars, ports, queues, agents, schedules",
-        AGENT    to "Manage installed agents: list, info, install, remove",
-        PIPELINE to "Submit and track multi-step agent pipelines from a JSON file"
+        AGENT    to "Manage installed agents: list, info, install, remove"
     )
 }

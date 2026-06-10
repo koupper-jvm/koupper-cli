@@ -19,13 +19,12 @@ import java.net.Socket
 //   - Job queues (pending / processing / failed / dead counts)
 //   - Installed agents
 //   - Configured schedules
-class DoctorCommand(
-    koupperDir: File = File(System.getProperty("user.home")!!, ".koupper")
-) : Command() {
+class DoctorCommand : Command() {
 
     override fun name(): String = "doctor"
 
-    private val koupperDir = koupperDir
+    private val home       = System.getProperty("user.home")!!
+    private val koupperDir = File(home, ".koupper")
 
     private var errors   = 0
     private var warnings = 0
@@ -65,24 +64,9 @@ class DoctorCommand(
             else sb.appendLine(ok("KOUPPER_LLM_EXECUTABLE", execPath))
         }
 
-        val telegramToken = System.getenv("KOUPPER_TELEGRAM_TOKEN")
-        if (telegramToken.isNullOrBlank()) {
-            sb.appendLine(info("KOUPPER_TELEGRAM_TOKEN", "not set — TelegramBridgeAgent disabled"))
-        } else {
-            sb.appendLine(ok("KOUPPER_TELEGRAM_TOKEN", "set (${telegramToken.take(8)}…)"))
-        }
-
-        val ollamaHost = System.getenv("OLLAMA_HOST")
-        if (!ollamaHost.isNullOrBlank())
-            sb.appendLine(info("OLLAMA_HOST", ollamaHost))
-
         val workerTimeout = System.getenv("KOUPPER_WORKER_TIMEOUT")
         if (!workerTimeout.isNullOrBlank())
             sb.appendLine(info("KOUPPER_WORKER_TIMEOUT", "${workerTimeout}s"))
-
-        val agentRegistry = System.getenv("KOUPPER_AGENT_REGISTRY")
-        if (!agentRegistry.isNullOrBlank())
-            sb.appendLine(info("KOUPPER_AGENT_REGISTRY", agentRegistry))
 
         sb.appendLine()
 
@@ -106,12 +90,9 @@ class DoctorCommand(
         sb.appendLine("  ${ANSI_YELLOW_229}Ports${ANSI_RESET}")
 
         checkPort(sb, 9998,  "Octopus socket")
-        checkPort(sb, 11434, "Ollama", required = false)
         checkPort(sb, 8081,  "llama-server (LLM)", required = false)
         checkPort(sb, 18082, "MCP server", required = false)
-        checkPort(sb, 18083, "Web UI (CORTEX)", required = false)
-        checkPort(sb, 18085, "KnowledgeQueryAgent", required = false)
-        checkPort(sb, 18086, "MasterKnowledgeAgent", required = false)
+        checkPort(sb, 18083, "Web UI", required = false)
 
         sb.appendLine()
 

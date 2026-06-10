@@ -17,8 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger
 //
 // Usage: koupper worker [jobsDir] [--queues=q1,q2] [--concurrency=N]
 //                       [--interval=ms] [--timeout=seconds] [--max-retries=N]
-//                       [--enable-scheduling] [--status] [--retry [queue]]
-//                       [--purge dead|failed [queue]] [--logs [jobId]]
+//                       [--enable-scheduling] [--status]
 //
 // Defaults:
 //   jobsDir            = ~/.koupper/jobs
@@ -29,9 +28,6 @@ import java.util.concurrent.atomic.AtomicInteger
 //   max-retries        = 3 — moves to .dead/ after N failures on the same job
 //   enable-scheduling  = false (reads ~/.koupper/schedules.json when set)
 //   --status           = print queue snapshot and exit without starting daemon
-//   --retry [queue]    = move all .failed/ jobs back to queue and exit
-//   --purge dead|failed [queue] = delete jobs from .dead/ or .failed/ and exit
-//   --logs [jobId]     = list recent job logs (no jobId) or print a specific job log
 class WorkerCommand : Command() {
 
     override fun name(): String = "worker"
@@ -45,25 +41,6 @@ class WorkerCommand : Command() {
             ?.let { File(it) } ?: File("$home/.koupper/jobs")
 
         if (args.any { it == "--status" }) return statusSnapshot(jobsDir)
-
-        val retryIdx = args.indexOfFirst { it == "--retry" }
-        if (retryIdx >= 0) {
-            val targetQueue = args.getOrNull(retryIdx + 1)?.takeIf { !it.startsWith("--") }
-            return retryFailed(jobsDir, targetQueue)
-        }
-
-        val purgeIdx = args.indexOfFirst { it == "--purge" }
-        if (purgeIdx >= 0) {
-            val bucket      = args.getOrNull(purgeIdx + 1)?.takeIf { !it.startsWith("--") }
-            val targetQueue = args.getOrNull(purgeIdx + 2)?.takeIf { !it.startsWith("--") }
-            return purgeBucket(jobsDir, bucket, targetQueue)
-        }
-
-        val logsIdx = args.indexOfFirst { it == "--logs" }
-        if (logsIdx >= 0) {
-            val jobId = args.getOrNull(logsIdx + 1)?.takeIf { !it.startsWith("--") }
-            return showLogs(jobsDir, jobId)
-        }
 
         val queues      = args.firstOrNull { it.startsWith("--queues=") }
             ?.removePrefix("--queues=")?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
@@ -99,6 +76,7 @@ class WorkerCommand : Command() {
             running.set(false)
         })
 
+        // Start scheduling engine if enabled
         if (enableScheduling) startScheduler(jobsDir, running)
 
         while (running.get()) {
@@ -115,12 +93,14 @@ class WorkerCommand : Command() {
     }
 
     // ── Scheduler engine ──────────────────────────────────────────────────────
+    // Reads ~/.koupper/schedules.json and submits jobs to queues at the right time.
 
     private fun startScheduler(jobsDir: File, running: AtomicBoolean) {
         val scheduler = Executors.newScheduledThreadPool(1) { r ->
             Thread(r, "koupper-scheduler").also { it.isDaemon = true }
         }
 
+        // Check every minute — matches cron resolution
         scheduler.scheduleAtFixedRate({
             if (!running.get()) { scheduler.shutdown(); return@scheduleAtFixedRate }
             val now     = LocalDateTime.now()
@@ -138,18 +118,22 @@ class WorkerCommand : Command() {
                                 now.dayOfMonth == runAt.dayOfMonth && now.hour == runAt.hour &&
                                 now.minute == runAt.minute) {
                                 submitScheduledJob(entry, jobsDir)
+                                // Disable after firing so it doesn't repeat
                                 ScheduleStore.setEnabled(entry.id, false)
                             }
                         }
                     }
+                    // "rate" schedules are handled by a separate fixed-rate timer below
                 }
             }
         }, 0, 60, TimeUnit.SECONDS)
 
+        // Rate-based schedules: start individual timers
         val rateEntries = ScheduleStore.load().filter { it.enabled && it.type == "rate" && (it.rateMs ?: 0) > 0 }
         for (entry in rateEntries) {
             scheduler.scheduleAtFixedRate({
                 if (!running.get()) return@scheduleAtFixedRate
+                // Re-check enabled in case it was disabled after start
                 if (ScheduleStore.load().any { it.id == entry.id && it.enabled }) {
                     submitScheduledJob(entry, jobsDir)
                 }
@@ -165,9 +149,8 @@ class WorkerCommand : Command() {
     private fun submitScheduledJob(entry: ScheduleEntry, jobsDir: File) {
         val jobId = "${entry.agent}-sched-${System.currentTimeMillis()}"
         val qDir  = File(jobsDir, entry.queue).also { it.mkdirs() }
-        val inputFragment = if (entry.input != null) ""","input":${entry.input}""" else ""
         File(qDir, "$jobId.json").writeText(
-            """{"id":"$jobId","fileName":"${entry.agent}","functionName":"run","scriptPath":"agents/${entry.agent}.kts","sourceType":"script","scheduledBy":"${entry.id}","submittedAt":"${LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))}"$inputFragment}"""
+            """{"id":"$jobId","fileName":"${entry.agent}","functionName":"run","scriptPath":"agents/${entry.agent}.kts","sourceType":"script","scheduledBy":"${entry.id}","submittedAt":"${LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))}"}"""
         )
         println("  ${ANSI_YELLOW_229}[SCHEDULER]${ANSI_RESET} ⏰ ${entry.id} → $jobId [${entry.queue}]")
     }
@@ -224,32 +207,23 @@ class WorkerCommand : Command() {
     ) {
         val jobId = processingFile.name.removeSuffix(".json.processing")
 
-        // Mutable so release() captures it; assigned immediately after read.
-        // When the read fails (file unreadable), jobJson stays "" → retryCount treated as 0.
-        var jobJson = ""
-
         fun ack()     { processingFile.delete() }
         fun release() {
-            if (jobJson.isBlank()) {
-                processingFile.renameTo(File(deadDir, originalName))
-                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ☠ $jobId → .dead/ (unreadable job file)")
-                return
-            }
-            val currentRetries = extractRawJsonValue(jobJson, "retryCount")?.toIntOrNull() ?: 0
-            val newRetries = currentRetries + 1
+            // Dead-letter after maxRetries: count existing .failed entries for this job base
+            val baseName  = originalName.removeSuffix(".json")
+            val failCount = failedDir.listFiles { f ->
+                f.name.startsWith(baseName) && f.name.endsWith(".json")
+            }?.size ?: 0
 
-            if (newRetries >= maxRetries) {
+            if (failCount >= maxRetries) {
                 processingFile.renameTo(File(deadDir, originalName))
-                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ☠ $jobId → .dead/ ($newRetries/$maxRetries retries)")
+                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ☠ $jobId → .dead/ (exceeded $maxRetries retries)")
             } else {
-                val updatedJson = updateRetryCount(jobJson, newRetries)
-                File(failedDir, originalName).writeText(updatedJson)
-                processingFile.delete()
-                println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET} ↩ $jobId → .failed/ (retry $newRetries/$maxRetries)")
+                processingFile.renameTo(File(failedDir, originalName))
             }
         }
 
-        jobJson = runCatching { processingFile.readText() }.getOrElse { e ->
+        val jobJson = runCatching { processingFile.readText() }.getOrElse { e ->
             println("  ${ANSI_RED}[WORKER] ERROR reading $jobId: ${e.message}${ANSI_RESET}")
             release(); return
         }
@@ -264,51 +238,31 @@ class WorkerCommand : Command() {
             release(); return
         }
 
-        // Pipeline input — JSON object/array from previous step, or null
-        val inputJson = extractRawJsonValue(jobJson, "input")
-            ?.takeIf { it.isNotBlank() && it != "null" }
-
-        // Per-job env vars — {"KEY": "value"} object in job JSON
-        val envOverrides: Map<String, String> = runCatching {
-            val envRaw = extractRawJsonValue(jobJson, "env")
-                ?.takeIf { it.startsWith("{") } ?: return@runCatching emptyMap()
-            // Parse flat {"KEY":"value"} without Jackson dependency
-            val result = mutableMapOf<String, String>()
-            val kvPattern = Regex(""""([^"]+)"\s*:\s*"([^"\\]*)"""")
-            kvPattern.findAll(envRaw).forEach { m -> result[m.groupValues[1]] = m.groupValues[2] }
-            result
-        }.getOrDefault(emptyMap())
-
         val logFile = File(jobsDir, "logs/$queue").also { it.mkdirs() }
             .let { File(it, "$jobId.log") }
 
         println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET} ▶ $jobId  [$queue]  (timeout: ${timeoutSec}s)")
-        if (envOverrides.isNotEmpty()) println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET}   env: ${envOverrides.keys.joinToString()}")
         val startMs = System.currentTimeMillis()
 
-        val cmd = buildList {
-            add(koupperBin); add("run"); add(scriptFile.absolutePath)
-            if (inputJson != null) add(inputJson)
-        }
-
         val proc = runCatching {
-            val pb = ProcessBuilder(cmd).redirectErrorStream(true)
-            if (envOverrides.isNotEmpty()) pb.environment().putAll(envOverrides)
-            pb.start()
+            ProcessBuilder(koupperBin, "run", scriptFile.absolutePath)
+                .redirectErrorStream(true)
+                .start()
         }.getOrElse { e ->
             logFile.appendText("[WORKER ERROR] Could not start process: ${e.message}\n")
             release(); return
         }
 
-        val readerThread = Thread {
+        // Stream output to log file in a daemon thread
+        Thread {
             proc.inputStream.bufferedReader().forEachLine { line ->
                 logFile.appendText("$line\n")
             }
-        }.also { it.isDaemon = true; it.start() }
+        }.also { it.isDaemon = true }.start()
 
+        // Wait with timeout — isolates the worker from hanging agents
         val finished = proc.waitFor(timeoutSec, TimeUnit.SECONDS)
         val elapsed  = System.currentTimeMillis() - startMs
-        readerThread.join(5_000)
 
         when {
             !finished -> {
@@ -318,65 +272,8 @@ class WorkerCommand : Command() {
                 release()
             }
             proc.exitValue() == 0 && !logContainsScriptError(logFile) -> {
-                // Prefer [RESULT] <json> sentinel (typed pipeline agents); fall back to last non-blank line
-                val lines = runCatching { logFile.readLines() }.getOrDefault(emptyList())
-                val sentinelJson = lines
-                    .firstOrNull { it.trimStart().startsWith("[RESULT] ") }
-                    ?.substringAfter("[RESULT] ")?.trim()
-
-                val scriptResult = sentinelJson ?: lines
-                    .filter { it.isNotBlank() && !it.startsWith("[DEBUG]") && !it.startsWith("[DONE]") && !it.startsWith("[RESULT]") }
-                    .lastOrNull()
-                    ?.replace(Regex("\\[[;\\d]*m"), "")
-                    ?.take(500)
-
                 logFile.appendText("[DONE] ${elapsed}ms\n")
                 println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} ✓ $jobId  (${elapsed}ms)")
-
-                // Write result file — includes provenance fields so the dashboard can show schema/envVars
-                runCatching {
-                    val doneDir = File(processingFile.parent, ".done").also { it.mkdirs() }
-                    val fileNameField = extractField(jobJson, "fileName")
-                        ?: extractField(jobJson, "scriptPath")?.let { java.io.File(it).nameWithoutExtension }
-                        ?: ""
-                    val scriptPathField  = extractField(jobJson, "scriptPath") ?: ""
-                    val submittedAtField = extractField(jobJson, "submittedAt") ?: ""
-                    val inputRaw         = extractRawJsonValue(jobJson, "input")
-                        ?.takeIf { it.isNotBlank() && it != "null" }
-
-                    val completedAt = java.time.Instant.now().toString()
-
-                    val resultJson = buildString {
-                        append("""{"id":"$jobId"""")
-                        if (fileNameField.isNotBlank())    append(""","fileName":"$fileNameField"""")
-                        if (scriptPathField.isNotBlank())  append(""","scriptPath":"$scriptPathField"""")
-                        if (submittedAtField.isNotBlank()) append(""","submittedAt":"$submittedAtField"""")
-                        append(""","completedAt":"$completedAt"""")
-                        if (inputRaw != null)              append(""","input":$inputRaw""")
-                        if (sentinelJson != null) {
-                            append(""","result":$sentinelJson""")
-                        } else if (!scriptResult.isNullOrBlank()) {
-                            val escaped = scriptResult.replace("\\", "\\\\").replace("\"", "\\\"")
-                            append(""","result":"$escaped"""")
-                        }
-                        append("}")
-                    }
-                    File(doneDir, "$jobId.result.json").writeText(resultJson)
-                }
-
-                // Pipeline dispatch: enqueue next step with this result as input
-                if (sentinelJson != null) {
-                    val pipelineNextStr = extractRawJsonValue(jobJson, "pipelineNext")
-                        ?.takeIf { it.isNotBlank() && it != "null" }
-                    if (pipelineNextStr != null) {
-                        val pipelineId    = extractField(jobJson, "pipelineId") ?: jobId
-                        val pipelineStep  = extractRawJsonValue(jobJson, "pipelineStep")?.toIntOrNull() ?: 0
-                        val pipelineTotal = extractRawJsonValue(jobJson, "pipelineTotal")?.toIntOrNull() ?: 0
-                        val qDir = processingFile.parentFile
-                        dispatchPipelineNext(pipelineNextStr, sentinelJson, pipelineId, pipelineStep + 1, pipelineTotal, qDir)
-                    }
-                }
-
                 ack()
             }
             else -> {
@@ -387,33 +284,6 @@ class WorkerCommand : Command() {
                 release()
             }
         }
-    }
-
-    private fun dispatchPipelineNext(
-        pipelineNextJson: String,
-        input: String,
-        pipelineId: String,
-        nextStep: Int,
-        pipelineTotal: Int,
-        qDir: File
-    ) {
-        val nextScript = extractField(pipelineNextJson, "scriptPath") ?: run {
-            println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ⚠ pipeline $pipelineId step $nextStep: missing scriptPath")
-            return
-        }
-        val nestedNext = extractRawJsonValue(pipelineNextJson, "pipelineNext")
-            ?.takeIf { it.isNotBlank() && it != "null" }
-        val nextJobId = "$pipelineId-step$nextStep"
-
-        val sb = StringBuilder()
-        sb.append("""{"id":"$nextJobId","scriptPath":"$nextScript","input":$input""")
-        sb.append(""","pipelineId":"$pipelineId","pipelineStep":$nextStep""")
-        if (pipelineTotal > 0) sb.append(""","pipelineTotal":$pipelineTotal""")
-        if (nestedNext != null) sb.append(""","pipelineNext":$nestedNext""")
-        sb.append("}")
-
-        File(qDir, "$nextJobId.json").writeText(sb.toString())
-        println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} ⟶ pipeline [$pipelineId] step $nextStep → $nextScript")
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -444,178 +314,6 @@ class WorkerCommand : Command() {
                 "Exception in thread \"main\"" in line
             }
         }
-    }
-
-    // ── Retry: move .failed/ → queue ──────────────────────────────────────────
-
-    private fun retryFailed(jobsDir: File, targetQueue: String?): String {
-        val sb = StringBuilder()
-        sb.appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER WORKER RETRY${ANSI_RESET}")
-        if (targetQueue != null) sb.appendLine("  Queue    : $targetQueue")
-        sb.appendLine("  Jobs dir : ${jobsDir.absolutePath}\n")
-
-        if (!jobsDir.exists()) {
-            sb.appendLine("  ${ANSI_YELLOW_229}No jobs directory found.${ANSI_RESET}")
-            return sb.toString()
-        }
-
-        val queues = if (targetQueue != null)
-            listOf(File(jobsDir, targetQueue)).filter { it.isDirectory }
-        else
-            queueDirs(jobsDir, emptyList())
-
-        if (queues.isEmpty()) {
-            sb.appendLine("  No queues found.")
-            return sb.toString()
-        }
-
-        var total = 0
-        queues.forEach { qDir ->
-            val failedDir = File(qDir, ".failed")
-            if (!failedDir.exists()) return@forEach
-            val jobs = failedDir.listFiles { f -> f.name.endsWith(".json") } ?: return@forEach
-            jobs.sortedBy { it.lastModified() }.forEach { file ->
-                val dest = File(qDir, file.name)
-                if (file.renameTo(dest)) {
-                    total++
-                    sb.appendLine("  ${ANSI_GREEN_155}↩${ANSI_RESET}  [${qDir.name}] ${file.name}")
-                } else {
-                    sb.appendLine("  ${ANSI_RED}✗${ANSI_RESET}  [${qDir.name}] ${file.name}  (could not move)")
-                }
-            }
-        }
-
-        if (total == 0) sb.appendLine("  No failed jobs to retry.")
-        else sb.appendLine("\n  ${ANSI_GREEN_155}$total job(s) re-queued.${ANSI_RESET}")
-
-        return sb.toString()
-    }
-
-    // ── Purge: delete jobs from .dead/ or .failed/ ────────────────────────────
-
-    private fun purgeBucket(jobsDir: File, bucket: String?, targetQueue: String?): String {
-        val sb = StringBuilder()
-
-        if (bucket != "dead" && bucket != "failed") {
-            return "\n  Usage: koupper worker --purge dead|failed [queue]\n"
-        }
-
-        sb.appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER WORKER PURGE${ANSI_RESET}  (.$bucket)")
-        if (targetQueue != null) sb.appendLine("  Queue    : $targetQueue")
-        sb.appendLine("  Jobs dir : ${jobsDir.absolutePath}\n")
-
-        if (!jobsDir.exists()) {
-            sb.appendLine("  ${ANSI_YELLOW_229}No jobs directory found.${ANSI_RESET}")
-            return sb.toString()
-        }
-
-        val queues = if (targetQueue != null)
-            listOf(File(jobsDir, targetQueue)).filter { it.isDirectory }
-        else
-            queueDirs(jobsDir, emptyList())
-
-        if (queues.isEmpty()) {
-            sb.appendLine("  No queues found.")
-            return sb.toString()
-        }
-
-        var total = 0
-        queues.forEach { qDir ->
-            val bucketDir = File(qDir, ".$bucket")
-            if (!bucketDir.exists()) return@forEach
-            val jobs = bucketDir.listFiles { f -> f.name.endsWith(".json") } ?: return@forEach
-            jobs.forEach { file ->
-                if (file.delete()) {
-                    total++
-                    sb.appendLine("  ${ANSI_RED}✗${ANSI_RESET}  [${qDir.name}] ${file.name}  deleted")
-                }
-            }
-        }
-
-        if (total == 0) sb.appendLine("  No $bucket jobs to purge.")
-        else sb.appendLine("\n  ${ANSI_GREEN_155}$total job(s) purged from .$bucket.${ANSI_RESET}")
-
-        return sb.toString()
-    }
-
-    // ── Logs: list recent or show specific job log ─────────────────────────────
-
-    private fun showLogs(jobsDir: File, jobId: String?): String {
-        val sb      = StringBuilder()
-        val logsDir = File(jobsDir, "logs")
-
-        if (jobId == null) {
-            sb.appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER WORKER LOGS${ANSI_RESET}")
-            sb.appendLine("  Logs dir : ${logsDir.absolutePath}\n")
-
-            if (!logsDir.exists()) {
-                sb.appendLine("  No logs directory found.")
-                return sb.toString()
-            }
-
-            val allLogs = logsDir.walkTopDown()
-                .filter { it.isFile && it.name.endsWith(".log") }
-                .sortedByDescending { it.lastModified() }
-                .take(20)
-                .toList()
-
-            if (allLogs.isEmpty()) {
-                sb.appendLine("  No logs found.")
-                return sb.toString()
-            }
-
-            sb.appendLine("  Recent jobs (latest ${allLogs.size}):\n")
-            val idW = allLogs.maxOf { it.nameWithoutExtension.length }.coerceAtLeast(6) + 2
-            sb.append("  ${"JOB ID".padEnd(idW)}${"QUEUE".padEnd(12)}STATUS\n")
-            sb.append("  ${"─".repeat(idW)}${"─".repeat(12)}──────────\n")
-
-            allLogs.forEach { f ->
-                val id    = f.nameWithoutExtension
-                val queue = f.parentFile.name
-                val text  = runCatching { f.readText() }.getOrDefault("")
-                val status = when {
-                    "[DONE]"    in text -> "${ANSI_GREEN_155}done${ANSI_RESET}"
-                    "[TIMEOUT]" in text -> "${ANSI_RED}timeout${ANSI_RESET}"
-                    "[FAILED]"  in text -> "${ANSI_RED}failed${ANSI_RESET}"
-                    else                -> "${ANSI_YELLOW_229}running?${ANSI_RESET}"
-                }
-                sb.appendLine("  ${id.padEnd(idW)}${queue.padEnd(12)}$status")
-            }
-
-            sb.appendLine("\n  Run: koupper worker --logs <jobId>")
-            return sb.toString()
-        }
-
-        // ── Specific job ──────────────────────────────────────────────────────
-
-        sb.appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER WORKER LOGS${ANSI_RESET}  $jobId\n")
-
-        if (!logsDir.exists()) {
-            sb.appendLine("  ${ANSI_RED}No logs directory found.${ANSI_RESET}")
-            return sb.toString()
-        }
-
-        val matches = logsDir.listFiles()
-            ?.filter { it.isDirectory }
-            ?.mapNotNull { qDir -> File(qDir, "$jobId.log").takeIf { it.exists() } }
-            ?: emptyList()
-
-        if (matches.isEmpty()) {
-            sb.appendLine("  ${ANSI_RED}No log found for: $jobId${ANSI_RESET}")
-            sb.appendLine("  Searched: ${logsDir.absolutePath}")
-            return sb.toString()
-        }
-
-        matches.forEach { logFile ->
-            val queue = logFile.parentFile.name
-            sb.appendLine("  ${ANSI_YELLOW_229}[$queue]${ANSI_RESET}  ${logFile.absolutePath}")
-            sb.appendLine("  ${"─".repeat(60)}")
-            sb.append(runCatching { logFile.readText() }.getOrDefault("(unreadable)"))
-            if (!sb.endsWith("\n")) sb.appendLine()
-            sb.appendLine("  ${"─".repeat(60)}")
-        }
-
-        return sb.toString()
     }
 
     private fun statusSnapshot(jobsDir: File): String {
@@ -674,61 +372,6 @@ class WorkerCommand : Command() {
         return sb.toString()
     }
 
-}
-
-// Embeds or updates the retryCount field in a job JSON string.
-// Appends the field before the closing brace when not present.
-internal fun updateRetryCount(json: String, count: Int): String {
-    val pattern = Regex(""""retryCount"\s*:\s*\d+""")
-    if (pattern.containsMatchIn(json)) return pattern.replace(json, """"retryCount":$count""")
-    val trimmed = json.trim()
-    return if (trimmed.endsWith("}")) trimmed.dropLast(1) + ""","retryCount":$count}"""
-    else json
-}
-
-// Extracts a quoted string field value from a flat JSON object.
-internal fun extractField(json: String, field: String): String? =
-    Regex(""""$field"\s*:\s*"([^"\\]*)"""").find(json)?.groupValues?.get(1)
-
-// Extracts a raw JSON value (object, array, boolean, null, or number) for a field.
-// Returns null if the field is absent. Returns the string "null" if the JSON value is null.
-// For quoted string fields use extractField instead.
-internal fun extractRawJsonValue(json: String, field: String): String? {
-    val keyMatch = Regex(""""$field"\s*:\s*""").find(json) ?: return null
-    var pos = keyMatch.range.last + 1
-    while (pos < json.length && json[pos].isWhitespace()) pos++
-    if (pos >= json.length) return null
-    return when {
-        json.startsWith("null",  pos) -> "null"
-        json.startsWith("true",  pos) -> "true"
-        json.startsWith("false", pos) -> "false"
-        json[pos] == '{' || json[pos] == '[' -> {
-            val open  = json[pos]
-            val close = if (open == '{') '}' else ']'
-            var depth = 0
-            val start = pos
-            var inStr = false
-            var escaped = false
-            while (pos < json.length) {
-                val c = json[pos]
-                when {
-                    escaped            -> escaped = false
-                    inStr && c == '\\' -> escaped = true
-                    c == '"'           -> inStr = !inStr
-                    !inStr && c == open  -> depth++
-                    !inStr && c == close -> {
-                        depth--
-                        if (depth == 0) return json.substring(start, pos + 1)
-                    }
-                }
-                pos++
-            }
-            null
-        }
-        else -> {
-            val start = pos
-            while (pos < json.length && json[pos] !in ",}] \n\r\t") pos++
-            json.substring(start, pos).trim().takeIf { it.isNotEmpty() }
-        }
-    }
+    private fun extractField(json: String, field: String): String? =
+        Regex(""""$field"\s*:\s*"([^"\\]*)"""").find(json)?.groupValues?.get(1)
 }

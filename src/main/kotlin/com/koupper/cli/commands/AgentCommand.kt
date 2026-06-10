@@ -19,14 +19,12 @@ import java.time.Duration
 //   koupper agent install <url>              — install agent from URL
 //   koupper agent install github:<user/repo/Agent.kts>
 //   koupper agent remove <name>              — uninstall an agent
-class AgentCommand(
-    agentsDir: File = File(System.getProperty("user.home")!!, ".koupper/agents")
-) : Command() {
+class AgentCommand : Command() {
 
     override fun name(): String = "agent"
 
     private val home      = System.getProperty("user.home")!!
-    private val agentsDir = agentsDir
+    private val agentsDir = File(home, ".koupper/agents")
 
     private val http = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
@@ -41,7 +39,6 @@ class AgentCommand(
             "info"    -> infoAgent(rest.firstOrNull())
             "install" -> installAgent(rest.firstOrNull())
             "remove"  -> removeAgent(rest.firstOrNull())
-            "search"  -> searchRegistry(rest.firstOrNull())
             else      -> "\n  Unknown subcommand '$sub'. Run 'koupper agent' for usage.\n"
         }
     }
@@ -233,22 +230,6 @@ class AgentCommand(
         if (resp.statusCode() == 200) resp.body() else null
     }.getOrNull()
 
-    // ── search ────────────────────────────────────────────────────────────────
-
-    private fun searchRegistry(query: String?): String {
-        val registryUrl = System.getenv("KOUPPER_AGENT_REGISTRY")
-            ?: "https://raw.githubusercontent.com/Iglymx/cortex/main/registry.json"
-
-        val sb = StringBuilder()
-        sb.appendLine("\n${ANSI_GREEN_155}  ◈ AGENT REGISTRY${ANSI_RESET}  ($registryUrl)\n")
-
-        val body = fetch(registryUrl)
-            ?: return sb.appendLine("  ${ANSI_RED}✗ Could not reach registry. Check your connection.${ANSI_RESET}\n").toString()
-
-        val installedNames = loadSkills().mapNotNull { it["name"]?.toString() }.toSet()
-        return sb.append(parseRegistryBody(body, query, installedNames)).toString()
-    }
-
     private fun usage() = """
   ${ANSI_GREEN_155}koupper agent${ANSI_RESET} — manage installed agents
 
@@ -257,79 +238,13 @@ class AgentCommand(
     info <name>             Show agent details
     install <url>           Install agent from URL or GitHub shorthand
     remove <name>           Uninstall an agent
-    search [query]          Browse the agent registry (online)
 
   ${ANSI_YELLOW_229}Examples:${ANSI_RESET}
     koupper agent list
-    koupper agent search
-    koupper agent search telegram
     koupper agent info RssFeedAgent
     koupper agent install https://raw.githubusercontent.com/user/repo/main/MyAgent.kts
     koupper agent install github:koupper-jvm/agents/WeatherAgent.kts
     koupper agent remove WeatherAgent
 
-  ${ANSI_YELLOW_229}Registry:${ANSI_RESET}
-    Override with env: KOUPPER_AGENT_REGISTRY=<url>
-
 """
-}
-
-// ── Registry parsing (internal for testability) ───────────────────────────────
-
-@Suppress("UNCHECKED_CAST")
-internal fun parseRegistryBody(body: String, query: String?, installedNames: Set<String>): String {
-    val registry = runCatching {
-        com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
-            .readValue(body, Map::class.java) as Map<String, Any>
-    }.getOrNull() ?: return "  ✗ Invalid registry format.\n"
-
-    val all = registry["agents"] as? List<Map<String, Any>> ?: emptyList()
-
-    val q = query?.lowercase()?.trim()
-    val matches = if (q.isNullOrBlank()) all else all.filter { agent ->
-        val name = agent["name"]?.toString()?.lowercase() ?: ""
-        val desc = agent["description"]?.toString()?.lowercase() ?: ""
-        val role = agent["role"]?.toString()?.lowercase() ?: ""
-        val tags = (agent["tags"] as? List<*>)?.joinToString(" ")?.lowercase() ?: ""
-        q in name || q in desc || q in role || q in tags
-    }
-
-    if (matches.isEmpty()) {
-        return if (q.isNullOrBlank()) "  0 agent(s) in registry.\n"
-        else "  No agents matched '$query'.\n"
-    }
-
-    val sb = StringBuilder()
-    val nameW = matches.maxOf { it["name"]?.toString()?.length ?: 0 }.coerceAtLeast(4) + 2
-    val roleW = matches.maxOf { it["role"]?.toString()?.length ?: 0 }.coerceAtLeast(4) + 2
-
-    sb.append("  ${"NAME".padEnd(nameW)}${"ROLE".padEnd(roleW)}${"VER".padEnd(8)}STATUS\n")
-    sb.append("  ${"─".repeat(nameW)}${"─".repeat(roleW)}${"─".repeat(8)}──────────\n")
-
-    matches.forEach { agent ->
-        val name    = agent["name"]?.toString() ?: "?"
-        val role    = agent["role"]?.toString() ?: ""
-        val version = agent["version"]?.toString() ?: "?"
-        val status  = if (name in installedNames) "installed" else "available"
-        sb.appendLine("  ${name.padEnd(nameW)}${role.padEnd(roleW)}${version.padEnd(8)}$status")
-    }
-
-    if (!q.isNullOrBlank()) {
-        sb.appendLine("\n  ${matches.size} result(s) for '$query'.")
-    } else {
-        sb.appendLine("\n  ${matches.size} agent(s) in registry.")
-    }
-    sb.appendLine("  Install with: koupper agent install <url>")
-    sb.appendLine("  URL shown with: koupper agent search <name>  (exact match shows url)")
-
-    val exact = matches.singleOrNull { it["name"]?.toString().equals(query, ignoreCase = true) }
-    if (exact != null) {
-        sb.appendLine()
-        sb.appendLine("  Install URL:")
-        sb.appendLine("    ${exact["url"]}")
-        sb.appendLine("  Quick install:")
-        sb.appendLine("    koupper agent install ${exact["url"]}")
-    }
-
-    return sb.toString()
 }

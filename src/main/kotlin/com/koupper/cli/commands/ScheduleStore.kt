@@ -14,7 +14,6 @@ data class ScheduleEntry(
     val cron: String?        = null,   // "0 8 * * *"
     val rateMs: Long?        = null,   // 3600000 = hourly
     val runAt: String?       = null,   // ISO datetime for "once"
-    val input: String?       = null,   // JSON string forwarded to job as input
     val enabled: Boolean     = true,
     val createdAt: String    = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
 )
