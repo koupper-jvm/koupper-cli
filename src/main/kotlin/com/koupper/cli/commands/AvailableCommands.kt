@@ -20,6 +20,8 @@ object AvailableCommands {
     const val DOCTOR   = "doctor"
     const val AGENT    = "agent"
     const val WATCH    = "watch"
+    const val MONITOR  = "monitor"
+    const val PIPELINE = "pipeline"
 
     fun commands(): Map<String, String> = mapOf(
         NEW to "Creates a module or script",

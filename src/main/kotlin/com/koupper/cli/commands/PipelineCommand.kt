@@ -418,3 +418,45 @@ internal fun parseStepObjects(arrayJson: String): List<PipelineStep> {
 }
 
 data class PipelineStep(val agent: String, val input: String?, val env: String?)
+
+internal fun extractField(json: String, field: String): String? =
+    Regex(""""$field"\s*:\s*"([^"\\]*)"""").find(json)?.groupValues?.get(1)
+
+internal fun extractRawJsonValue(json: String, field: String): String? {
+    val m = Regex(""""$field"\s*:\s*""").find(json) ?: return null
+    var pos = m.range.last + 1
+    while (pos < json.length && json[pos].isWhitespace()) pos++
+    if (pos >= json.length) return null
+    return when (json[pos]) {
+        '"' -> {
+            var i = pos + 1; var escaped = false
+            while (i < json.length) {
+                if (escaped) escaped = false
+                else if (json[i] == '\\') escaped = true
+                else if (json[i] == '"') return json.substring(pos, i + 1)
+                i++
+            }
+            null
+        }
+        '{', '[' -> {
+            val open = json[pos]; val close = if (open == '{') '}' else ']'
+            var depth = 0; var inStr = false; var escaped = false; var i = pos
+            while (i < json.length) {
+                val c = json[i]
+                when {
+                    escaped -> escaped = false
+                    inStr && c == '\\' -> escaped = true
+                    c == '"' -> inStr = !inStr
+                    !inStr && c == open -> depth++
+                    !inStr && c == close -> { depth--; if (depth == 0) return json.substring(pos, i + 1) }
+                }
+                i++
+            }
+            null
+        }
+        else -> {
+            val end = json.indexOfAny(charArrayOf(',', '}', ']', '\n'), pos)
+            (if (end == -1) json.substring(pos) else json.substring(pos, end)).trim()
+        }
+    }
+}
