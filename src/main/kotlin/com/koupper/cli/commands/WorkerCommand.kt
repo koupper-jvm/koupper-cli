@@ -4,6 +4,8 @@ import com.koupper.cli.ANSIColors.ANSI_GREEN_155
 import com.koupper.cli.ANSIColors.ANSI_RED
 import com.koupper.cli.ANSIColors.ANSI_RESET
 import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -193,6 +195,23 @@ class WorkerCommand : Command() {
         }
     }
 
+    // ── Pipeline chaining ─────────────────────────────────────────────────────
+
+    private fun extractJsonBlock(json: String, key: String): String? {
+        val start = json.indexOf("\"$key\":{")
+        if (start < 0) return null
+        var i = start + key.length + 4
+        var depth = 1
+        while (i < json.length && depth > 0) {
+            when (json[i]) {
+                '{' -> depth++
+                '}' -> depth--
+            }
+            i++
+        }
+        return json.substring(start + key.length + 3, i)
+    }
+
     // ── Job execution with isolation ──────────────────────────────────────────
 
     private fun runJob(
@@ -238,14 +257,25 @@ class WorkerCommand : Command() {
             release(); return
         }
 
+        val input = runCatching {
+            val mapper = jacksonObjectMapper()
+            val map = mapper.readValue<Map<String, Any?>>(jobJson)
+            map["input"] as? String
+        }.getOrNull()
+
         val logFile = File(jobsDir, "logs/$queue").also { it.mkdirs() }
             .let { File(it, "$jobId.log") }
 
         println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET} ▶ $jobId  [$queue]  (timeout: ${timeoutSec}s)")
         val startMs = System.currentTimeMillis()
 
+        val cmd = if (input != null)
+            listOf(koupperBin, "run", scriptFile.absolutePath, input)
+        else
+            listOf(koupperBin, "run", scriptFile.absolutePath)
+
         val proc = runCatching {
-            ProcessBuilder(koupperBin, "run", scriptFile.absolutePath)
+            ProcessBuilder(cmd)
                 .redirectErrorStream(true)
                 .start()
         }.getOrElse { e ->
@@ -275,6 +305,7 @@ class WorkerCommand : Command() {
                 logFile.appendText("[DONE] ${elapsed}ms\n")
                 println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} ✓ $jobId  (${elapsed}ms)")
                 ack()
+                enqueueNextStep(jobJson, queue, jobsDir, logFile)
             }
             else -> {
                 val exit = proc.exitValue()
@@ -284,6 +315,40 @@ class WorkerCommand : Command() {
                 release()
             }
         }
+    }
+
+    private fun enqueueNextStep(jobJson: String, queue: String, jobsDir: File, logFile: File) {
+        val mapper = jacksonObjectMapper()
+        val jobMap = runCatching {
+            mapper.readValue<Map<String, Any?>>(jobJson)
+        }.getOrNull() ?: return
+
+        @Suppress("UNCHECKED_CAST")
+        val pipelineNext = jobMap["pipelineNext"] as? Map<String, Any?> ?: return
+        val pipelineId = jobMap["pipelineId"] as? String ?: return
+        val step    = (jobMap["pipelineStep"] as? Number)?.toInt() ?: return
+        val total   = (jobMap["pipelineTotal"] as? Number)?.toInt() ?: return
+        val nextStep  = step + 1
+        val nextJobId = "$pipelineId-step$nextStep"
+
+        val result = if (logFile.exists()) {
+            logFile.useLines { lines ->
+                lines.firstOrNull { it.startsWith("[RESULT] ") }
+                    ?.removePrefix("[RESULT] ")?.trim()
+            }
+        } else null
+
+        val queueDir = File(jobsDir, queue).also { it.mkdirs() }
+        val nextJob = mutableMapOf<String, Any?>()
+        nextJob["id"] = nextJobId
+        nextJob.putAll(pipelineNext) // scriptPath + nested pipelineNext
+        nextJob["pipelineId"] = pipelineId
+        nextJob["pipelineStep"] = nextStep
+        nextJob["pipelineTotal"] = total
+        if (result != null) nextJob["input"] = result
+
+        File(queueDir, "$nextJobId.json").writeText(mapper.writeValueAsString(nextJob))
+        println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} → $nextJobId (pipeline ${nextStep + 1}/$total)")
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -374,4 +439,7 @@ class WorkerCommand : Command() {
 
     private fun extractField(json: String, field: String): String? =
         Regex(""""$field"\s*:\s*"([^"\\]*)"""").find(json)?.groupValues?.get(1)
+
+    private fun extractIntField(json: String, field: String): Int? =
+        Regex(""""$field"\s*:\s*(-?\d+)""").find(json)?.groupValues?.get(1)?.toIntOrNull()
 }
