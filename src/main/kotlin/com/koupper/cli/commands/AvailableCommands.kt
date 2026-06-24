@@ -20,6 +20,7 @@ object AvailableCommands {
     const val DOCTOR   = "doctor"
     const val AGENT    = "agent"
     const val WATCH    = "watch"
+    const val RELOAD   = "reload"
 
     fun commands(): Map<String, String> = mapOf(
         NEW to "Creates a module or script",
@@ -35,6 +36,7 @@ object AvailableCommands {
         WORKER   to "Starts a job worker daemon that executes agent scripts from the queue",
         SCHEDULE to "Manage recurring agent schedules (cron, rate, once)",
         DOCTOR   to "Diagnose the Koupper runtime: env vars, ports, queues, agents, schedules",
-        AGENT    to "Manage installed agents: list, info, install, remove"
+        AGENT    to "Manage installed agents: list, info, install, remove",
+        RELOAD   to "Reloads the Koupper daemon providers in hot mode without restarting"
     )
 }

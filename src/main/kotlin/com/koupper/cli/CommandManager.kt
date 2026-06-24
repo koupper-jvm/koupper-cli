@@ -13,6 +13,7 @@ import com.koupper.cli.commands.AvailableCommands.PROVIDER
 import com.koupper.cli.commands.AvailableCommands.RECONCILE
 import com.koupper.cli.commands.AvailableCommands.RUN
 import com.koupper.cli.commands.AvailableCommands.DEPLOY
+import com.koupper.cli.commands.AvailableCommands.RELOAD
 import com.koupper.cli.commands.AvailableCommands.INFRA
 import com.koupper.cli.commands.AvailableCommands.JOB
 import com.koupper.cli.commands.AvailableCommands.WATCH
@@ -73,7 +74,8 @@ class CommandManager {
             SCHEDULE to ScheduleCommand(),
             DOCTOR   to DoctorCommand(),
             AGENT    to AgentCommand(),
-            WATCH    to WatchCommand()
+            WATCH    to WatchCommand(),
+            RELOAD   to ReloadCommand()
         )
     }
 
