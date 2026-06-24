@@ -9,7 +9,7 @@ import java.io.PrintWriter
 import java.net.Socket
 
 class ReloadCommand : Command() {
-    override val name: String = "reload"
+    override fun name(): String = "reload"
 
     override fun execute(vararg args: String): String {
         try {
