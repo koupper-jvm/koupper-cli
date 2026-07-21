@@ -123,18 +123,12 @@ class ModuleCommand : Command() {
 
         currentLocation = targetDir
 
-        val libDir = File(currentLocation, "libs")
-        val octopusJar = libDir.listFiles { f ->
-            f.isFile && f.name.startsWith("octopus-") && f.name.endsWith(".jar")
-        }?.maxByOrNull { it.lastModified() }
+        System.setProperty("koupper.scripting.quiet", "true")
+        System.setProperty("koupper.scripting.showWarnings", "false")
+        // Also expose target for helpers that prefer env over %TARGET% placeholder.
+        System.setProperty("KOUPPER_MODULE_TARGET", targetDir.absolutePath)
 
-        val octopusDependencyInfo = if (octopusJar != null) {
-            val name = octopusJar.name
-            val version = name.removePrefix("octopus-").removeSuffix(".jar")
-            "📦 Octopus dependency: $name (version $version)\n"
-        } else {
-            "⚠️ Octopus dependency not found in ${libDir.absolutePath}\n"
-        }
+        val octopusDependencyInfo = resolveOctopusDependencyInfo(currentLocation)
 
         val koupperHelpersDirectory = File(System.getProperty("user.home"), ".koupper/helpers")
         if (!koupperHelpersDirectory.exists() && !koupperHelpersDirectory.mkdirs()) {
@@ -152,11 +146,12 @@ class ModuleCommand : Command() {
         val replacedScript = finalScriptContent.replace("%TARGET%", escapedPath)
         finalScript.writeText(replacedScript, Charsets.UTF_8)
 
+        // Prefer env-based target used by newer list helpers.
         CommandManager.commands["run"]?.execute(koupperHelpersDirectory.absolutePath, "list.kts") ?: ""
 
         results += buildModuleAnalysisResult()
 
-        results += buildModuleControllersResult()
+        results += buildModuleRoutesResult()
 
         results += describeHttpConfig()
 
@@ -166,6 +161,32 @@ class ModuleCommand : Command() {
         }
 
         return "\n$octopusDependencyInfo\n" + results.joinToString("\n")
+    }
+
+    private fun resolveOctopusDependencyInfo(moduleDir: File): String {
+        val libDir = File(moduleDir, "libs")
+        val octopusJar = libDir.listFiles { f ->
+            f.isFile && f.name.startsWith("octopus-") && f.name.endsWith(".jar")
+        }?.maxByOrNull { it.lastModified() }
+
+        if (octopusJar != null) {
+            val version = octopusJar.name.removePrefix("octopus-").removeSuffix(".jar")
+            return "📦 Octopus dependency: ${octopusJar.name} (version $version, libs/)\n"
+        }
+
+        val buildFile = sequenceOf("build.gradle", "build.gradle.kts")
+            .map { File(moduleDir, it) }
+            .firstOrNull { it.exists() }
+
+        if (buildFile != null) {
+            val match = Regex("""com\.koupper:octopus:([^\s"'\\)]+)""")
+                .find(buildFile.readText())
+            if (match != null) {
+                return "📦 Octopus dependency: com.koupper:octopus:${match.groupValues[1]} (gradle)\n"
+            }
+        }
+
+        return "⚠️ Octopus dependency not found in ${libDir.absolutePath} or build.gradle(.kts)\n"
     }
 
     private fun addScriptsToExistingModule(vararg args: String): String {
@@ -433,7 +454,7 @@ class ModuleCommand : Command() {
 
         val pattern = Regex(""".*\.http\.(json|ya?ml)$""")
         val candidate = currentLocation.listFiles()?.firstOrNull { it.name.matches(pattern) }
-            ?: return "❌ No se encontró ningún archivo .http.json o .http.yml en $currentLocation \n"
+            ?: return "ℹ️  No .http.json / .http.yml contract (optional for V7 RuntimeRouter apps)\n"
 
         val yaml = Yaml()
         val config = yaml.loadAs(candidate.inputStream(), ApiConfig::class.java)
@@ -515,7 +536,7 @@ class ModuleCommand : Command() {
         return sb.toString()
     }
 
-    private fun buildModuleControllersResult(): String {
+    private fun buildModuleRoutesResult(): String {
         val result = StringBuilder()
         val GREEN = "\u001B[32m"
         val CYAN = "\u001B[36m"
@@ -523,35 +544,50 @@ class ModuleCommand : Command() {
         val RESET = "\u001B[0m"
         val DIM = "\u001B[2m"
 
-        val file = File(System.getProperty("user.home"), ".koupper/helpers/controllers.json")
-        if (!file.exists()) return "⚠️  No controllers found\n"
-
         val mapper = jacksonObjectMapper()
-        val raw: Any = mapper.readValue(file, object : com.fasterxml.jackson.core.type.TypeReference<Any>() {})
+        val helpers = File(System.getProperty("user.home"), ".koupper/helpers")
 
-            val data: Map<String, Any?> = when (raw) {
-                is Map<*, *> -> raw.entries.associate { it.key.toString() to it.value }
-                is List<*> -> mapOf("controllers" to raw)
-                else -> emptyMap()
+        fun readRouteEntries(fileName: String): List<Map<String, Any?>> {
+            val file = File(helpers, fileName)
+            if (!file.exists()) return emptyList()
+            return try {
+                val raw: Any = mapper.readValue(file, object : TypeReference<Any>() {})
+                when (raw) {
+                    is List<*> -> raw.mapNotNull { entry ->
+                        (entry as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value }
+                    }
+                    is Map<*, *> -> {
+                        val nested = raw["controllers"] ?: raw["routers"]
+                        when (nested) {
+                            is List<*> -> nested.mapNotNull { entry ->
+                                (entry as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value }
+                            }
+                            else -> listOf(raw.entries.associate { it.key.toString() to it.value })
+                        }
+                    }
+                    else -> emptyList()
+                }
+            } catch (_: Exception) {
+                emptyList()
             }
+        }
 
-            val moreInfo = data["more_info"]?.toString()?.trim().orEmpty()
-            if (moreInfo.isNotBlank()) {
-                result.append(moreInfo)
-                if (!moreInfo.endsWith("\n")) result.append("\n")
-                result.append("\n")
-            }
+        val routers = readRouteEntries("routers.json")
+        val controllers = readRouteEntries("controllers.json")
 
-            val controllers = data["controllers"].asListOfMapStringAny()
-            if (controllers.isEmpty()) return result.toString()
+        if (routers.isEmpty() && controllers.isEmpty()) {
+            return "⚠️  No V7 routes or Jersey controllers found\n"
+        }
 
-            result.append(" ⚙️ Controllers found:\n\n")
+        fun appendRouteGroup(title: String, entries: List<Map<String, Any?>>) {
+            if (entries.isEmpty()) return
+            result.append(" $title\n\n")
 
-            val allEndpoints = controllers.flatMap { it["endpoints"].asListOfMapStringAny() }
+            val allEndpoints = entries.flatMap { it["endpoints"].asListOfMapStringAny() }
             val maxMethod = (allEndpoints.maxOfOrNull { (it["method"]?.toString() ?: "Unknown").length } ?: 6).coerceAtLeast(6)
             val maxHandler = (allEndpoints.maxOfOrNull { (it["handler"]?.toString() ?: "Unknown").length } ?: 7).coerceAtLeast(7)
 
-            controllers.forEachIndexed { idx, entry ->
+            entries.forEachIndexed { idx, entry ->
                 val port = entry["port"] ?: "Unknown"
                 val name = entry["controller"] as? String ?: "Unknown"
                 val basePath = entry["path"] ?: "/"
@@ -561,7 +597,7 @@ class ModuleCommand : Command() {
                     result.append("${DIM}────────────────────────────────────────────────────────────${RESET}\n\n")
                 }
 
-                result.append("🔹 Controller: ${CYAN}$name$RESET (port ${YELLOW}$port$RESET, base path: ${YELLOW}$basePath$RESET)\n\n")
+                result.append("🔹 $name (port ${YELLOW}$port$RESET, base path: ${YELLOW}$basePath$RESET)\n\n")
 
                 if (endpoints.isEmpty()) {
                     result.append("   └ No endpoints found.\n\n")
@@ -581,7 +617,7 @@ class ModuleCommand : Command() {
                             """
    └ ${GREEN}${methodPad}$RESET ${YELLOW}${endpointPath}$RESET  ${DIM}handler:${RESET} ${CYAN}${handlerPad}$RESET
        ↳ fn: ${CYAN}${function}$RESET
-                        """.trimIndent()
+                            """.trimIndent()
                         )
 
                         if (consumes != "None" || produces != "None") {
@@ -589,7 +625,7 @@ class ModuleCommand : Command() {
                                 """
                             
        ↳ io: ${YELLOW}${consumes}$RESET → ${YELLOW}${produces}$RESET
-                            """.trimIndent()
+                                """.trimIndent()
                             )
                         }
 
@@ -597,6 +633,14 @@ class ModuleCommand : Command() {
                     }
                 }
             }
+        }
+
+        appendRouteGroup("⚙️ V7 Routes found:", routers)
+        appendRouteGroup("⚙️ Jersey Controllers found:", controllers)
+
+        // Cleanup helper payloads after display
+        File(helpers, "routers.json").delete()
+        File(helpers, "controllers.json").delete()
 
         return result.toString().trimEnd() + "\n\n"
     }
