@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`koupper module`**: print V7 RuntimeRouter routes (not only Jersey controllers); detect `com.koupper:octopus` from Gradle; quieter scan (`koupper.scripting.quiet`); soften missing `.http.json` for V7 apps.
+
 ## [7.2.0] - 2026-07-20
 
 ### Added
