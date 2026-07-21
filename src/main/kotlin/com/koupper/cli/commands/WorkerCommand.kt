@@ -227,34 +227,34 @@ class WorkerCommand : Command() {
         val jobId = processingFile.name.removeSuffix(".json.processing")
 
         fun ack()     { processingFile.delete() }
-        fun release() {
-            // Dead-letter after maxRetries: count existing .failed entries for this job base
-            val baseName  = originalName.removeSuffix(".json")
-            val failCount = failedDir.listFiles { f ->
-                f.name.startsWith(baseName) && f.name.endsWith(".json")
-            }?.size ?: 0
+        fun release(jobJson: String) {
+            // Persist attempts in job JSON so retries survive .failed → requeue cycles
+            val nextAttempts = WorkerJobPolicy.readAttempts(jobJson) + 1
+            val updatedJson = WorkerJobPolicy.withAttempts(jobJson, nextAttempts)
+            runCatching { processingFile.writeText(updatedJson) }
 
-            if (failCount >= maxRetries) {
+            if (WorkerJobPolicy.shouldDeadLetter(nextAttempts, maxRetries)) {
                 processingFile.renameTo(File(deadDir, originalName))
-                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ☠ $jobId → .dead/ (exceeded $maxRetries retries)")
+                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ☠ $jobId → .dead/ (attempt $nextAttempts/$maxRetries)")
             } else {
                 processingFile.renameTo(File(failedDir, originalName))
+                println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET} ✗ $jobId → .failed/ (attempt $nextAttempts/$maxRetries)")
             }
         }
 
         val jobJson = runCatching { processingFile.readText() }.getOrElse { e ->
             println("  ${ANSI_RED}[WORKER] ERROR reading $jobId: ${e.message}${ANSI_RESET}")
-            release(); return
+            release("""{"id":"$jobId"}"""); return
         }
 
         val scriptPath = extractField(jobJson, "scriptPath") ?: run {
             println("  ${ANSI_RED}[WORKER] ERROR: no scriptPath in $jobId${ANSI_RESET}")
-            release(); return
+            release(jobJson); return
         }
 
         val scriptFile = resolveScript(scriptPath) ?: run {
             println("  ${ANSI_RED}[WORKER] ERROR: script not found: $scriptPath${ANSI_RESET}")
-            release(); return
+            release(jobJson); return
         }
 
         val input = runCatching {
@@ -280,7 +280,7 @@ class WorkerCommand : Command() {
                 .start()
         }.getOrElse { e ->
             logFile.appendText("[WORKER ERROR] Could not start process: ${e.message}\n")
-            release(); return
+            release(jobJson); return
         }
 
         // Stream output to log file in a daemon thread
@@ -299,7 +299,7 @@ class WorkerCommand : Command() {
                 proc.destroyForcibly()
                 logFile.appendText("[TIMEOUT] Job exceeded ${timeoutSec}s — process killed\n")
                 println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ⏱ $jobId timed out (${timeoutSec}s) — killed")
-                release()
+                release(jobJson)
             }
             proc.exitValue() == 0 && !logContainsScriptError(logFile) -> {
                 logFile.appendText("[DONE] ${elapsed}ms\n")
@@ -312,7 +312,7 @@ class WorkerCommand : Command() {
                 val reason = if (logContainsScriptError(logFile)) "script error" else "exit=$exit"
                 logFile.appendText("[FAILED] $reason  ${elapsed}ms\n")
                 println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ✗ $jobId  $reason  (${elapsed}ms)")
-                release()
+                release(jobJson)
             }
         }
     }
@@ -391,10 +391,7 @@ class WorkerCommand : Command() {
             return sb.toString()
         }
 
-        val queues = jobsDir.listFiles()
-            ?.filter { it.isDirectory && !it.name.startsWith(".") && it.name !in excluded }
-            ?.sortedBy { it.name }
-            ?: emptyList()
+        val queues = WorkerJobPolicy.listQueues(jobsDir, excluded)
 
         if (queues.isEmpty()) {
             sb.appendLine("  No queues found.")
@@ -404,25 +401,22 @@ class WorkerCommand : Command() {
         var totalPending = 0; var totalProcessing = 0; var totalFailed = 0; var totalDead = 0
 
         queues.forEach { qDir ->
-            val pending    = qDir.listFiles { f -> f.name.endsWith(".json") }?.size ?: 0
-            val processing = qDir.listFiles { f -> f.name.endsWith(".json.processing") }?.size ?: 0
-            val failed     = File(qDir, ".failed").listFiles { f -> f.name.endsWith(".json") }?.size ?: 0
-            val dead       = File(qDir, ".dead").listFiles { f -> f.name.endsWith(".json") }?.size ?: 0
+            val c = WorkerJobPolicy.countQueue(qDir)
 
-            totalPending += pending; totalProcessing += processing
-            totalFailed  += failed;  totalDead       += dead
+            totalPending += c.pending; totalProcessing += c.processing
+            totalFailed  += c.failed;  totalDead       += c.dead
 
             val indicator = when {
-                dead > 0        -> "${ANSI_RED}☠${ANSI_RESET}"
-                failed > 0      -> "${ANSI_YELLOW_229}⚠${ANSI_RESET}"
-                processing > 0  -> "${ANSI_GREEN_155}▶${ANSI_RESET}"
+                c.dead > 0        -> "${ANSI_RED}☠${ANSI_RESET}"
+                c.failed > 0      -> "${ANSI_YELLOW_229}⚠${ANSI_RESET}"
+                c.processing > 0  -> "${ANSI_GREEN_155}▶${ANSI_RESET}"
                 else            -> "○"
             }
             sb.append("  $indicator  ${qDir.name.padEnd(14)}")
-            sb.append("  ${ANSI_YELLOW_229}${pending}p${ANSI_RESET}")
-            sb.append("  ${ANSI_GREEN_155}${processing}▶${ANSI_RESET}")
-            sb.append("  ${ANSI_RED}${failed}f${ANSI_RESET}")
-            sb.append("  ${ANSI_RED}${dead}☠${ANSI_RESET}")
+            sb.append("  ${ANSI_YELLOW_229}${c.pending}p${ANSI_RESET}")
+            sb.append("  ${ANSI_GREEN_155}${c.processing}▶${ANSI_RESET}")
+            sb.append("  ${ANSI_RED}${c.failed}f${ANSI_RESET}")
+            sb.append("  ${ANSI_RED}${c.dead}☠${ANSI_RESET}")
             sb.appendLine()
         }
 

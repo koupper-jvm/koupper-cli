@@ -35,7 +35,7 @@ object AvailableCommands {
         RECONCILE to "Orchestrates infra/preflight/deploy/smoke/rollback pipelines",
         WORKER   to "Starts a job worker daemon that executes agent scripts from the queue",
         SCHEDULE to "Manage recurring agent schedules (cron, rate, once)",
-        DOCTOR   to "Diagnose the Koupper runtime: env vars, ports, queues, agents, schedules",
+        DOCTOR   to "Diagnose OS/local install: Java, PATH, jars, ports, queues, agents, schedules",
         AGENT    to "Manage installed agents: list, info, install, remove",
         RELOAD   to "Reloads the Koupper daemon providers in hot mode without restarting"
     )
