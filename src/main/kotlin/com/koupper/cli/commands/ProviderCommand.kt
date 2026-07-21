@@ -56,11 +56,13 @@ class ProviderCommand : Command() {
         super.usage = "\n" + """
    koupper provider list                          Lists available service providers.
    koupper provider info <provider-id-or-class>  Shows detailed provider information.
+   koupper provider new <provider-id>             Generates a new Service Provider scaffold.
         """
         super.description = "\n   Lists service providers and their environment requirements\n"
         super.arguments = mapOf(
             "list" to "Shows all providers with a short description.",
-            "info <name>" to "Shows contracts, implementations, tags and environment variables."
+            "info <name>" to "Shows contracts, implementations, tags and environment variables.",
+            "new <name>" to "Generates code, tests, and documentation for a new provider."
         )
         super.additionalInformation = "\n   For provider setup details, see official documentation."
     }
@@ -75,6 +77,13 @@ class ProviderCommand : Command() {
         }
 
         val subcommand = realArgs.first().lowercase()
+
+        if (subcommand == "new") {
+            val name = realArgs.getOrNull(1)
+                ?: return "\n${ANSIColors.ANSI_RED}Missing provider name. Use: koupper provider new <name>${ANSI_RESET}\n"
+            return scaffoldProvider(name)
+        }
+
         val catalog = loadCatalog() ?: return missingCatalogMessage()
 
         return when (subcommand) {
@@ -86,6 +95,131 @@ class ProviderCommand : Command() {
             }
 
             else -> "\n${ANSIColors.ANSI_RED}Unknown provider subcommand: '$subcommand'${ANSI_RESET}\n${showUsage()}"
+        }
+    }
+
+    private fun scaffoldProvider(name: String): String {
+        val id = name.lowercase().replace(Regex("[^a-z0-9]"), "")
+        val className = name.split(Regex("[-_ ]"))
+            .joinToString("") { it.replaceFirstChar { char -> char.uppercase() } }
+        val packageName = id
+
+        val sb = StringBuilder()
+        sb.appendLine("\n${ANSI_YELLOW_229}Scaffolding new provider: $ANSI_GREEN_155$className$ANSI_RESET\n")
+
+        val root = System.getProperty("user.dir")
+        
+        // 1. Core Provider Interface
+        val providerPath = "koupper/providers/src/main/kotlin/com/koupper/providers/$packageName/${className}Provider.kt"
+        val providerContent = """
+            package com.koupper.providers.$packageName
+            
+            import com.koupper.providers.ServiceProvider
+            
+            /**
+             * Contract for the $className provider.
+             */
+            interface ${className}Provider {
+                /**
+                 * Example operation for $className.
+                 */
+                fun ping(): ${className}Response
+            }
+            
+            data class ${className}Response(
+                val ok: Boolean,
+                val message: String,
+                val metadata: Map<String, Any?> = emptyMap()
+            )
+        """.trimIndent()
+        writeFile(root, providerPath, providerContent, sb)
+
+        // 2. Service Provider Implementation
+        val serviceProviderPath = "koupper/providers/src/main/kotlin/com/koupper/providers/$packageName/${className}ServiceProvider.kt"
+        val serviceProviderContent = """
+            package com.koupper.providers.$packageName
+            
+            import com.koupper.container.interfaces.Container
+            import com.koupper.providers.ServiceProvider
+            
+            class ${className}ServiceProvider(private val container: Container) : ServiceProvider {
+                override fun up() {
+                    this.container.bind(${className}Provider::class) {
+                        ${className}Impl()
+                    }
+                }
+            }
+            
+            class ${className}Impl : ${className}Provider {
+                override fun ping(): ${className}Response {
+                    return ${className}Response(true, "pong from $className")
+                }
+            }
+        """.trimIndent()
+        writeFile(root, serviceProviderPath, serviceProviderContent, sb)
+
+        // 3. Unit Test
+        val testPath = "koupper/providers/src/test/kotlin/com/koupper/providers/$packageName/${className}ProviderTest.kt"
+        val testContent = """
+            package com.koupper.providers.$packageName
+            
+            import kotlin.test.Test
+            import kotlin.test.assertTrue
+            import kotlin.test.assertEquals
+            
+            class ${className}ProviderTest {
+                @Test
+                fun `should ping successfully`() {
+                    val provider = ${className}Impl()
+                    val response = provider.ping()
+                    
+                    assertTrue(response.ok)
+                    assertEquals("pong from $className", response.message)
+                }
+            }
+        """.trimIndent()
+        writeFile(root, testPath, testContent, sb)
+
+        // 4. Documentation
+        val docsPath = "koupper-docs/docs/providers/$id.md"
+        val docsContent = """
+            # $className Provider
+            
+            Brief description of what the $className provider does.
+            
+            ## Environment Variables
+            
+            | Name | Required | Description |
+            | --- | --- | --- |
+            | `${className.uppercase()}_API_KEY` | Yes | API key for $className. |
+            
+            ## Usage Example
+            
+            ```kotlin
+            val $id = app.getInstance(${className}Provider::class)
+            val response = ${id}.ping()
+            
+            println(response.message)
+            ```
+        """.trimIndent()
+        writeFile(root, docsPath, docsContent, sb)
+
+        sb.appendLine("\n${ANSI_YELLOW_229}Manual steps remaining:${ANSI_RESET}")
+        sb.appendLine("1. Register ${ANSI_GREEN_155}${className}ServiceProvider${ANSI_RESET} in ${ANSI_WHITE}koupper/providers/src/main/kotlin/com/koupper/providers/ServiceProviderManager.kt${ANSI_RESET}")
+        sb.appendLine("2. Add entry to ${ANSI_WHITE}koupper/providers/src/main/resources/providers-catalog.json${ANSI_RESET}")
+        sb.appendLine("3. Run tests: ${ANSI_WHITE}./gradlew :providers:test --tests \"com.koupper.providers.$packageName.*\"${ANSI_RESET}")
+
+        return sb.toString()
+    }
+
+    private fun writeFile(root: String, relativePath: String, content: String, sb: StringBuilder) {
+        val file = File(root, relativePath)
+        try {
+            file.parentFile.mkdirs()
+            file.writeText(content)
+            sb.appendLine("  ${ANSI_GREEN_155}✓${ANSI_RESET} Created $relativePath")
+        } catch (e: Exception) {
+            sb.appendLine("  ${ANSIColors.ANSI_RED}✗${ANSI_RESET} Failed to create $relativePath: ${e.message}")
         }
     }
 

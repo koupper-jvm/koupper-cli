@@ -15,16 +15,28 @@ object AvailableCommands {
     const val PROVIDER = "provider"
     const val INFRA = "infra"
     const val RECONCILE = "reconcile"
+    const val WORKER   = "worker"
+    const val SCHEDULE = "schedule"
+    const val DOCTOR   = "doctor"
+    const val AGENT    = "agent"
+    const val WATCH    = "watch"
+    const val RELOAD   = "reload"
 
     fun commands(): Map<String, String> = mapOf(
         NEW to "Creates a module or script",
         RUN to "Runs a kotlin script",
+        WATCH to "Watch a project and manage dependencies automatically via Octopus Sentinel",
         DEPLOY to "Deploys a .kts script to a remote Octopus daemon",
         HELP to "Displays information about a command",
         MODULE to "Analyzes and inspects existing modules and their structure.",
         JOB to "Creates and manages background job workers",
         PROVIDER to "Lists available service providers and environment requirements",
         INFRA to "Runs Terraform-based infrastructure lifecycle commands",
-        RECONCILE to "Orchestrates infra/preflight/deploy/smoke/rollback pipelines"
+        RECONCILE to "Orchestrates infra/preflight/deploy/smoke/rollback pipelines",
+        WORKER   to "Starts a job worker daemon that executes agent scripts from the queue",
+        SCHEDULE to "Manage recurring agent schedules (cron, rate, once)",
+        DOCTOR   to "Diagnose OS/local install: Java, PATH, jars, ports, queues, agents, schedules",
+        AGENT    to "Manage installed agents: list, info, install, remove",
+        RELOAD   to "Reloads the Koupper daemon providers in hot mode without restarting"
     )
 }

@@ -4,13 +4,19 @@ import com.koupper.cli.ANSIColors.ANSI_RED
 import com.koupper.cli.commands.*
 import com.koupper.cli.commands.AvailableCommands.HELP
 import com.koupper.cli.commands.AvailableCommands.MODULE
+import com.koupper.cli.commands.AvailableCommands.WORKER
+import com.koupper.cli.commands.AvailableCommands.SCHEDULE
+import com.koupper.cli.commands.AvailableCommands.DOCTOR
+import com.koupper.cli.commands.AvailableCommands.AGENT
 import com.koupper.cli.commands.AvailableCommands.NEW
 import com.koupper.cli.commands.AvailableCommands.PROVIDER
 import com.koupper.cli.commands.AvailableCommands.RECONCILE
 import com.koupper.cli.commands.AvailableCommands.RUN
 import com.koupper.cli.commands.AvailableCommands.DEPLOY
+import com.koupper.cli.commands.AvailableCommands.RELOAD
 import com.koupper.cli.commands.AvailableCommands.INFRA
 import com.koupper.cli.commands.AvailableCommands.JOB
+import com.koupper.cli.commands.AvailableCommands.WATCH
 import com.koupper.cli.commands.jobs.JobCommand
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -63,7 +69,13 @@ class CommandManager {
             JOB to JobCommand(),
             PROVIDER to ProviderCommand(),
             INFRA to InfraCommand(),
-            RECONCILE to ReconcileCommand()
+            RECONCILE to ReconcileCommand(),
+            WORKER   to WorkerCommand(),
+            SCHEDULE to ScheduleCommand(),
+            DOCTOR   to DoctorCommand(),
+            AGENT    to AgentCommand(),
+            WATCH    to WatchCommand(),
+            RELOAD   to ReloadCommand()
         )
     }
 

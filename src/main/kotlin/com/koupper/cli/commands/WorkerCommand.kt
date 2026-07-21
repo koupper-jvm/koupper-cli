@@ -1,0 +1,439 @@
+package com.koupper.cli.commands
+
+import com.koupper.cli.ANSIColors.ANSI_GREEN_155
+import com.koupper.cli.ANSIColors.ANSI_RED
+import com.koupper.cli.ANSIColors.ANSI_RESET
+import com.koupper.cli.ANSIColors.ANSI_YELLOW_229
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
+import java.io.File
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+
+// Daemon that continuously polls job queues under jobsDir, claims jobs atomically,
+// executes agent scripts via `koupper run`, and writes output to the job log file.
+//
+// Usage: koupper worker [jobsDir] [--queues=q1,q2] [--concurrency=N]
+//                       [--interval=ms] [--timeout=seconds] [--max-retries=N]
+//                       [--enable-scheduling] [--status]
+//
+// Defaults:
+//   jobsDir            = ~/.koupper/jobs
+//   queues             = all subdirectories (excluding logs, commands)
+//   concurrency        = 2
+//   interval           = 2000ms
+//   timeout            = 300s (5 min) — env KOUPPER_WORKER_TIMEOUT overrides default
+//   max-retries        = 3 — moves to .dead/ after N failures on the same job
+//   enable-scheduling  = false (reads ~/.koupper/schedules.json when set)
+//   --status           = print queue snapshot and exit without starting daemon
+class WorkerCommand : Command() {
+
+    override fun name(): String = "worker"
+
+    private val home       = System.getProperty("user.home")!!
+    private val koupperBin = "$home/.koupper/bin/koupper"
+    private val excluded   = setOf("logs", "commands")
+
+    override fun execute(vararg args: String): String {
+        val jobsDir     = args.drop(1).firstOrNull { !it.startsWith("--") }
+            ?.let { File(it) } ?: File("$home/.koupper/jobs")
+
+        if (args.any { it == "--status" }) return statusSnapshot(jobsDir)
+
+        val queues      = args.firstOrNull { it.startsWith("--queues=") }
+            ?.removePrefix("--queues=")?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+        val concurrency = args.firstOrNull { it.startsWith("--concurrency=") }
+            ?.removePrefix("--concurrency=")?.toIntOrNull() ?: 2
+        val intervalMs  = args.firstOrNull { it.startsWith("--interval=") }
+            ?.removePrefix("--interval=")?.toLongOrNull() ?: 2000L
+        val timeoutSec       = args.firstOrNull { it.startsWith("--timeout=") }
+            ?.removePrefix("--timeout=")?.toLongOrNull()
+            ?: System.getenv("KOUPPER_WORKER_TIMEOUT")?.toLongOrNull()
+            ?: 300L
+        val maxRetries       = args.firstOrNull { it.startsWith("--max-retries=") }
+            ?.removePrefix("--max-retries=")?.toIntOrNull() ?: 3
+        val enableScheduling = args.any { it == "--enable-scheduling" }
+
+        jobsDir.mkdirs()
+
+        println("\n${ANSI_GREEN_155}  ◈ KOUPPER WORKER${ANSI_RESET}")
+        println("  Jobs dir    : ${jobsDir.absolutePath}")
+        println("  Queues      : ${if (queues.isEmpty()) "all" else queues.joinToString(", ")}")
+        println("  Concurrency : $concurrency")
+        println("  Poll        : ${intervalMs}ms")
+        println("  Timeout     : ${timeoutSec}s per job")
+        println("  Max retries : $maxRetries before dead-letter")
+        println("  Scheduling  : ${if (enableScheduling) "${ANSI_GREEN_155}enabled${ANSI_RESET}" else "disabled (--enable-scheduling to activate)"}")
+        println("  Press Ctrl+C to stop\n")
+
+        val running = AtomicBoolean(true)
+        val active  = AtomicInteger(0)
+
+        Runtime.getRuntime().addShutdownHook(Thread {
+            println("\n  Worker shutting down…")
+            running.set(false)
+        })
+
+        // Start scheduling engine if enabled
+        if (enableScheduling) startScheduler(jobsDir, running)
+
+        while (running.get()) {
+            if (active.get() < concurrency) {
+                for (qDir in queueDirs(jobsDir, queues)) {
+                    if (active.get() >= concurrency) break
+                    claimAndRun(qDir, jobsDir, active, concurrency, timeoutSec, maxRetries)
+                }
+            }
+            Thread.sleep(intervalMs)
+        }
+
+        return ""
+    }
+
+    // ── Scheduler engine ──────────────────────────────────────────────────────
+    // Reads ~/.koupper/schedules.json and submits jobs to queues at the right time.
+
+    private fun startScheduler(jobsDir: File, running: AtomicBoolean) {
+        val scheduler = Executors.newScheduledThreadPool(1) { r ->
+            Thread(r, "koupper-scheduler").also { it.isDaemon = true }
+        }
+
+        // Check every minute — matches cron resolution
+        scheduler.scheduleAtFixedRate({
+            if (!running.get()) { scheduler.shutdown(); return@scheduleAtFixedRate }
+            val now     = LocalDateTime.now()
+            val entries = ScheduleStore.load().filter { it.enabled }
+
+            for (entry in entries) {
+                when (entry.type) {
+                    "cron" -> if (entry.cron != null && CronMatcher.matches(entry.cron, now)) {
+                        submitScheduledJob(entry, jobsDir)
+                    }
+                    "once" -> if (entry.runAt != null) {
+                        runCatching {
+                            val runAt = LocalDateTime.parse(entry.runAt, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                            if (now.year  == runAt.year  && now.month  == runAt.month  &&
+                                now.dayOfMonth == runAt.dayOfMonth && now.hour == runAt.hour &&
+                                now.minute == runAt.minute) {
+                                submitScheduledJob(entry, jobsDir)
+                                // Disable after firing so it doesn't repeat
+                                ScheduleStore.setEnabled(entry.id, false)
+                            }
+                        }
+                    }
+                    // "rate" schedules are handled by a separate fixed-rate timer below
+                }
+            }
+        }, 0, 60, TimeUnit.SECONDS)
+
+        // Rate-based schedules: start individual timers
+        val rateEntries = ScheduleStore.load().filter { it.enabled && it.type == "rate" && (it.rateMs ?: 0) > 0 }
+        for (entry in rateEntries) {
+            scheduler.scheduleAtFixedRate({
+                if (!running.get()) return@scheduleAtFixedRate
+                // Re-check enabled in case it was disabled after start
+                if (ScheduleStore.load().any { it.id == entry.id && it.enabled }) {
+                    submitScheduledJob(entry, jobsDir)
+                }
+            }, entry.rateMs!!, entry.rateMs, TimeUnit.MILLISECONDS)
+            println("  ${ANSI_GREEN_155}[SCHEDULER]${ANSI_RESET} ${entry.id} every ${entry.rateMs / 1000}s")
+        }
+
+        val cronEntries = ScheduleStore.load().filter { it.enabled && it.type == "cron" }
+        val onceEntries = ScheduleStore.load().filter { it.enabled && it.type == "once" }
+        println("  ${ANSI_GREEN_155}[SCHEDULER]${ANSI_RESET} loaded: ${cronEntries.size} cron, ${rateEntries.size} rate, ${onceEntries.size} once")
+    }
+
+    private fun submitScheduledJob(entry: ScheduleEntry, jobsDir: File) {
+        val jobId = "${entry.agent}-sched-${System.currentTimeMillis()}"
+        val qDir  = File(jobsDir, entry.queue).also { it.mkdirs() }
+        File(qDir, "$jobId.json").writeText(
+            """{"id":"$jobId","fileName":"${entry.agent}","functionName":"run","scriptPath":"agents/${entry.agent}.kts","sourceType":"script","scheduledBy":"${entry.id}","submittedAt":"${LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))}"}"""
+        )
+        println("  ${ANSI_YELLOW_229}[SCHEDULER]${ANSI_RESET} ⏰ ${entry.id} → $jobId [${entry.queue}]")
+    }
+
+    // ── Claim loop ────────────────────────────────────────────────────────────
+
+    private fun claimAndRun(
+        qDir: File, jobsDir: File,
+        active: AtomicInteger, concurrency: Int,
+        timeoutSec: Long, maxRetries: Int
+    ) {
+        val pending   = qDir.listFiles { f -> f.isFile && f.name.endsWith(".json") }
+            ?.sortedBy { it.lastModified() } ?: return
+        val failedDir = File(qDir, ".failed").also { it.mkdirs() }
+        val deadDir   = File(qDir, ".dead").also { it.mkdirs() }
+
+        for (file in pending) {
+            if (active.get() >= concurrency) break
+
+            val processingFile = File(file.parent, "${file.name}.processing")
+            if (!file.renameTo(processingFile)) continue
+
+            active.incrementAndGet()
+            Thread {
+                try {
+                    runJob(
+                        processingFile = processingFile,
+                        originalName   = file.name,
+                        queue          = qDir.name,
+                        jobsDir        = jobsDir,
+                        failedDir      = failedDir,
+                        deadDir        = deadDir,
+                        timeoutSec     = timeoutSec,
+                        maxRetries     = maxRetries
+                    )
+                } finally {
+                    active.decrementAndGet()
+                }
+            }.also { it.isDaemon = true }.start()
+        }
+    }
+
+    // ── Pipeline chaining ─────────────────────────────────────────────────────
+
+    private fun extractJsonBlock(json: String, key: String): String? {
+        val start = json.indexOf("\"$key\":{")
+        if (start < 0) return null
+        var i = start + key.length + 4
+        var depth = 1
+        while (i < json.length && depth > 0) {
+            when (json[i]) {
+                '{' -> depth++
+                '}' -> depth--
+            }
+            i++
+        }
+        return json.substring(start + key.length + 3, i)
+    }
+
+    // ── Job execution with isolation ──────────────────────────────────────────
+
+    private fun runJob(
+        processingFile: File,
+        originalName: String,
+        queue: String,
+        jobsDir: File,
+        failedDir: File,
+        deadDir: File,
+        timeoutSec: Long,
+        maxRetries: Int
+    ) {
+        val jobId = processingFile.name.removeSuffix(".json.processing")
+
+        fun ack()     { processingFile.delete() }
+        fun release(jobJson: String) {
+            // Persist attempts in job JSON so retries survive .failed → requeue cycles
+            val nextAttempts = WorkerJobPolicy.readAttempts(jobJson) + 1
+            val updatedJson = WorkerJobPolicy.withAttempts(jobJson, nextAttempts)
+            runCatching { processingFile.writeText(updatedJson) }
+
+            if (WorkerJobPolicy.shouldDeadLetter(nextAttempts, maxRetries)) {
+                processingFile.renameTo(File(deadDir, originalName))
+                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ☠ $jobId → .dead/ (attempt $nextAttempts/$maxRetries)")
+            } else {
+                processingFile.renameTo(File(failedDir, originalName))
+                println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET} ✗ $jobId → .failed/ (attempt $nextAttempts/$maxRetries)")
+            }
+        }
+
+        val jobJson = runCatching { processingFile.readText() }.getOrElse { e ->
+            println("  ${ANSI_RED}[WORKER] ERROR reading $jobId: ${e.message}${ANSI_RESET}")
+            release("""{"id":"$jobId"}"""); return
+        }
+
+        val scriptPath = extractField(jobJson, "scriptPath") ?: run {
+            println("  ${ANSI_RED}[WORKER] ERROR: no scriptPath in $jobId${ANSI_RESET}")
+            release(jobJson); return
+        }
+
+        val scriptFile = resolveScript(scriptPath) ?: run {
+            println("  ${ANSI_RED}[WORKER] ERROR: script not found: $scriptPath${ANSI_RESET}")
+            release(jobJson); return
+        }
+
+        val input = runCatching {
+            val mapper = jacksonObjectMapper()
+            val map = mapper.readValue<Map<String, Any?>>(jobJson)
+            map["input"] as? String
+        }.getOrNull()
+
+        val logFile = File(jobsDir, "logs/$queue").also { it.mkdirs() }
+            .let { File(it, "$jobId.log") }
+
+        println("  ${ANSI_YELLOW_229}[WORKER]${ANSI_RESET} ▶ $jobId  [$queue]  (timeout: ${timeoutSec}s)")
+        val startMs = System.currentTimeMillis()
+
+        val cmd = if (input != null)
+            listOf(koupperBin, "run", scriptFile.absolutePath, input)
+        else
+            listOf(koupperBin, "run", scriptFile.absolutePath)
+
+        val proc = runCatching {
+            ProcessBuilder(cmd)
+                .redirectErrorStream(true)
+                .start()
+        }.getOrElse { e ->
+            logFile.appendText("[WORKER ERROR] Could not start process: ${e.message}\n")
+            release(jobJson); return
+        }
+
+        // Stream output to log file in a daemon thread
+        Thread {
+            proc.inputStream.bufferedReader().forEachLine { line ->
+                logFile.appendText("$line\n")
+            }
+        }.also { it.isDaemon = true }.start()
+
+        // Wait with timeout — isolates the worker from hanging agents
+        val finished = proc.waitFor(timeoutSec, TimeUnit.SECONDS)
+        val elapsed  = System.currentTimeMillis() - startMs
+
+        when {
+            !finished -> {
+                proc.destroyForcibly()
+                logFile.appendText("[TIMEOUT] Job exceeded ${timeoutSec}s — process killed\n")
+                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ⏱ $jobId timed out (${timeoutSec}s) — killed")
+                release(jobJson)
+            }
+            proc.exitValue() == 0 && !logContainsScriptError(logFile) -> {
+                logFile.appendText("[DONE] ${elapsed}ms\n")
+                println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} ✓ $jobId  (${elapsed}ms)")
+                ack()
+                enqueueNextStep(jobJson, queue, jobsDir, logFile)
+            }
+            else -> {
+                val exit = proc.exitValue()
+                val reason = if (logContainsScriptError(logFile)) "script error" else "exit=$exit"
+                logFile.appendText("[FAILED] $reason  ${elapsed}ms\n")
+                println("  ${ANSI_RED}[WORKER]${ANSI_RESET} ✗ $jobId  $reason  (${elapsed}ms)")
+                release(jobJson)
+            }
+        }
+    }
+
+    private fun enqueueNextStep(jobJson: String, queue: String, jobsDir: File, logFile: File) {
+        val mapper = jacksonObjectMapper()
+        val jobMap = runCatching {
+            mapper.readValue<Map<String, Any?>>(jobJson)
+        }.getOrNull() ?: return
+
+        @Suppress("UNCHECKED_CAST")
+        val pipelineNext = jobMap["pipelineNext"] as? Map<String, Any?> ?: return
+        val pipelineId = jobMap["pipelineId"] as? String ?: return
+        val step    = (jobMap["pipelineStep"] as? Number)?.toInt() ?: return
+        val total   = (jobMap["pipelineTotal"] as? Number)?.toInt() ?: return
+        val nextStep  = step + 1
+        val nextJobId = "$pipelineId-step$nextStep"
+
+        val result = if (logFile.exists()) {
+            logFile.useLines { lines ->
+                lines.firstOrNull { it.startsWith("[RESULT] ") }
+                    ?.removePrefix("[RESULT] ")?.trim()
+            }
+        } else null
+
+        val queueDir = File(jobsDir, queue).also { it.mkdirs() }
+        val nextJob = mutableMapOf<String, Any?>()
+        nextJob["id"] = nextJobId
+        nextJob.putAll(pipelineNext) // scriptPath + nested pipelineNext
+        nextJob["pipelineId"] = pipelineId
+        nextJob["pipelineStep"] = nextStep
+        nextJob["pipelineTotal"] = total
+        if (result != null) nextJob["input"] = result
+
+        File(queueDir, "$nextJobId.json").writeText(mapper.writeValueAsString(nextJob))
+        println("  ${ANSI_GREEN_155}[WORKER]${ANSI_RESET} → $nextJobId (pipeline ${nextStep + 1}/$total)")
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private fun queueDirs(jobsDir: File, queues: List<String>): List<File> =
+        if (queues.isEmpty())
+            jobsDir.listFiles()
+                ?.filter { it.isDirectory && !it.name.startsWith(".") && it.name !in excluded }
+                ?: emptyList()
+        else
+            queues.map { File(jobsDir, it) }.filter { it.isDirectory }
+
+    private fun resolveScript(scriptPath: String): File? {
+        File(scriptPath).takeIf { it.isAbsolute && it.exists() }?.let { return it }
+        File("$home/.koupper/$scriptPath").takeIf { it.exists() }?.let { return it }
+        File("$home/.koupper/agents", File(scriptPath).name).takeIf { it.exists() }?.let { return it }
+        return null
+    }
+
+    private fun logContainsScriptError(logFile: File): Boolean {
+        if (!logFile.exists()) return false
+        return logFile.useLines { lines ->
+            lines.any { line ->
+                "No function annotated with @Export was found" in line ||
+                "Script error:" in line ||
+                "<ERROR::>" in line ||
+                "error: unresolved reference" in line ||
+                "Exception in thread \"main\"" in line
+            }
+        }
+    }
+
+    private fun statusSnapshot(jobsDir: File): String {
+        val sb = StringBuilder()
+        sb.appendLine("\n${ANSI_GREEN_155}  ◈ KOUPPER WORKER STATUS${ANSI_RESET}")
+        sb.appendLine("  Jobs dir : ${jobsDir.absolutePath}\n")
+
+        if (!jobsDir.exists()) {
+            sb.appendLine("  ${ANSI_YELLOW_229}No jobs directory found.${ANSI_RESET}")
+            return sb.toString()
+        }
+
+        val queues = WorkerJobPolicy.listQueues(jobsDir, excluded)
+
+        if (queues.isEmpty()) {
+            sb.appendLine("  No queues found.")
+            return sb.toString()
+        }
+
+        var totalPending = 0; var totalProcessing = 0; var totalFailed = 0; var totalDead = 0
+
+        queues.forEach { qDir ->
+            val c = WorkerJobPolicy.countQueue(qDir)
+
+            totalPending += c.pending; totalProcessing += c.processing
+            totalFailed  += c.failed;  totalDead       += c.dead
+
+            val indicator = when {
+                c.dead > 0        -> "${ANSI_RED}☠${ANSI_RESET}"
+                c.failed > 0      -> "${ANSI_YELLOW_229}⚠${ANSI_RESET}"
+                c.processing > 0  -> "${ANSI_GREEN_155}▶${ANSI_RESET}"
+                else            -> "○"
+            }
+            sb.append("  $indicator  ${qDir.name.padEnd(14)}")
+            sb.append("  ${ANSI_YELLOW_229}${c.pending}p${ANSI_RESET}")
+            sb.append("  ${ANSI_GREEN_155}${c.processing}▶${ANSI_RESET}")
+            sb.append("  ${ANSI_RED}${c.failed}f${ANSI_RESET}")
+            sb.append("  ${ANSI_RED}${c.dead}☠${ANSI_RESET}")
+            sb.appendLine()
+        }
+
+        sb.appendLine()
+        sb.append("  Total  ")
+        sb.append("  ${ANSI_YELLOW_229}${totalPending}p${ANSI_RESET}")
+        sb.append("  ${ANSI_GREEN_155}${totalProcessing}▶${ANSI_RESET}")
+        sb.append("  ${ANSI_RED}${totalFailed}f${ANSI_RESET}")
+        sb.append("  ${ANSI_RED}${totalDead}☠${ANSI_RESET}")
+        sb.appendLine("\n")
+
+        return sb.toString()
+    }
+
+    private fun extractField(json: String, field: String): String? =
+        Regex(""""$field"\s*:\s*"([^"\\]*)"""").find(json)?.groupValues?.get(1)
+
+    private fun extractIntField(json: String, field: String): Int? =
+        Regex(""""$field"\s*:\s*(-?\d+)""").find(json)?.groupValues?.get(1)?.toIntOrNull()
+}

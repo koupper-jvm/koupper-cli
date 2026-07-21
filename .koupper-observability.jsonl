@@ -1,0 +1,4 @@
+{"type":"trace","span":"script.execution","attributes":{"exportId":"/tmp/test_koupper.kts::run","kind":"KTS","scriptPath":"/tmp/test_koupper.kts","status":"ok"},"durationMs":0,"timestamp":"2026-05-29T01:18:21.248063051Z"}
+{"type":"metric","name":"script.execution.durationMs","value":0.0,"tags":{"kind":"KTS","status":"ok"},"timestamp":"2026-05-29T01:18:21.249500403Z"}
+{"type":"trace","span":"script.execution","attributes":{"exportId":"/tmp/test_koupper.kts::run","kind":"KTS","scriptPath":"/tmp/test_koupper.kts","status":"ok"},"durationMs":0,"timestamp":"2026-05-29T01:46:37.006731852Z"}
+{"type":"metric","name":"script.execution.durationMs","value":0.0,"tags":{"kind":"KTS","status":"ok"},"timestamp":"2026-05-29T01:46:37.006904365Z"}
