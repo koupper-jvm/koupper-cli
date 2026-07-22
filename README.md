@@ -1,2 +1,19 @@
-# Koupper cli
-Is an assistant for your local host environment bonded to Koupper-Architecture.
+# koupper-cli
+
+Terminal client for the Koupper (Octopus) engine.
+
+## Install
+
+Prefer the [standalone installer](https://github.com/koupper-jvm/koupper/releases/latest) (installs CLI + engine together).
+
+Docs: https://koupper.com/
+
+## Common commands
+
+```bash
+koupper -v
+koupper doctor
+koupper run script.kts
+koupper module <name>
+koupper provider list
+```
