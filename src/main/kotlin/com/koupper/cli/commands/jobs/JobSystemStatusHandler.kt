@@ -26,6 +26,8 @@ class JobSystemStatusHandler : JobSubcommandHandler {
     }
 
     private fun generateJobDisplayerScript(configId: String?): String {
+        val configIdLiteral = configId?.let { "\"$it\"" } ?: "null"
+
         return """
             import com.koupper.shared.annotations.Export
             import com.koupper.container.context
@@ -33,7 +35,7 @@ class JobSystemStatusHandler : JobSubcommandHandler {
 
             @Export
             val setup: (JobDisplayer) -> String = { displayer ->
-                displayer.showStatus(context!!, configId = "$configId")
+                displayer.showStatus(context!!, configId = $configIdLiteral)
             }
         """.trimIndent()
     }
