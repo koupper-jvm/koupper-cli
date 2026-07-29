@@ -3,5 +3,8 @@ import com.koupper.octopus.process.ModuleAnalyzer
 
 @Export
 val setup: (ModuleAnalyzer) -> Unit = { analyzer ->
-    analyzer.target("%TARGET%").run()
+    val target = System.getenv("KOUPPER_MODULE_TARGET")
+        ?.takeIf { it.isNotBlank() }
+        ?: "%TARGET%"
+    analyzer.target(target).run()
 }
