@@ -33,3 +33,7 @@ koupper provider list
 ## Contributing
 
 Branch from **`develop`**, PR into **`develop`**. See [koupper/CONTRIBUTING.md](https://github.com/koupper-jvm/koupper/blob/develop/CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE)
