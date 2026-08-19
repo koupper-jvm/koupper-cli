@@ -63,3 +63,5 @@ gradle-app.setting
 
 bin/
 **/bin/
+.env
+.koupper-observability.jsonl
