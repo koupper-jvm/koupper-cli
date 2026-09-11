@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.2.2] - 2026-09-10
+
+### Changed
+- Aligned CLI version with Octopus **7.2.2** to support Hailo Vision provider.
+
 ## [7.2.1] - 2026-07-29
 
 ### Added
